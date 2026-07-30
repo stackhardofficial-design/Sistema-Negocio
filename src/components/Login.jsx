@@ -58,9 +58,10 @@ export default function Login() {
             border: '1px solid var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
-            boxShadow: 'var(--shadow-accent)'
+            boxShadow: 'var(--shadow-accent)',
+            overflow: 'hidden'
           }}>
-            <ShoppingBag size={36} color="var(--accent)" />
+            <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
             Sistema Buffet

@@ -61,9 +61,10 @@ export default function Sidebar() {
           background: 'var(--accent-soft)',
           border: '1px solid var(--accent)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0
+          flexShrink: 0,
+          overflow: 'hidden'
         }}>
-          <ShoppingBag size={20} color="var(--accent)" />
+          <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         {!sidebarCollapsed && (
           <div style={{ overflow: 'hidden' }}>

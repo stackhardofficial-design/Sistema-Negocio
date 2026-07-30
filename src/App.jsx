@@ -76,9 +76,9 @@ function AppShell() {
           width: '56px', height: '56px', borderRadius: '16px',
           background: 'var(--accent-soft)', border: '1px solid var(--accent)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: '8px'
+          marginBottom: '8px', overflow: 'hidden'
         }}>
-          <span style={{ fontSize: '28px' }}>🛒</span>
+          <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div className="spinner" />
         <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Cargando sistema...</span>

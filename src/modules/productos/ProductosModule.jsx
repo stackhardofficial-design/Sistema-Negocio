@@ -5,6 +5,7 @@ import {
   dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
+import BarcodeScanner from '../../components/BarcodeScanner'
 import { Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag } from 'lucide-react'
 
 function formatMoney(n) {
@@ -325,6 +326,11 @@ export default function ProductosModule() {
                   onChange={e => setForm(p => ({ ...p, barcode: e.target.value }))}
                   placeholder="Ej: 7790001234567"
                   style={{ flex: 1 }}
+                />
+                <BarcodeScanner 
+                  onScan={(code) => setForm(p => ({ ...p, barcode: code }))} 
+                  active={modal.open} 
+                  showCamera={true} 
                 />
                 <button
                   type="button"
