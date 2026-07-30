@@ -17,6 +17,7 @@ export default function Login() {
     try {
       const { error } = await dbLogin(email, password)
       if (error) throw error
+      window.location.reload()
     } catch (err) {
       toast(err.message === 'Invalid login credentials'
         ? 'Email o contraseña incorrectos'
