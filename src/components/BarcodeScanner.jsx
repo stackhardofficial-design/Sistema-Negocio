@@ -1,35 +1,36 @@
-import { useState, useEffect, useRef } from 'react'
-import { Camera, X, Loader, Hash } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Camera, X, Loader, Scan } from 'lucide-react'
 
 /**
  * BarcodeScanner - Escáner de código de barras
- * Soporta: cámara del dispositivo + lector físico (teclado)
- * onScan(barcode: string) => void
+ * 
+ * En desktop/escáneres físicos: captura automáticamente teclas rápidas seguidas de Enter
+ * En móvil: abre la cámara trasera con input type=file + capture, y usa BarcodeDetector si está disponible
+ * 
+ * Props:
+ *   onScan(barcode: string) - callback cuando se detecta un código
+ *   active - si el scanner está activo (para evitar conflictos)
+ *   showCamera - mostrar botón de cámara
  */
 export default function BarcodeScanner({ onScan, active = true, showCamera = false }) {
-  const inputRef = useRef(null)
-  const [buffer, setBuffer] = useState('')
-  const [lastKeyTime, setLastKeyTime] = useState(0)
   const [scanning, setScanning] = useState(false)
-  const [fallback, setFallback] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
-  const fallbackInputRef = useRef(null)
+  const [error, setError] = useState('')
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const detectorRef = useRef(null)
+  const detectingRef = useRef(false)
 
   // ===== LECTOR FÍSICO (USB HID) =====
-  // Los lectores de código de barras envían el código como si fuera un teclado muy rápido
   useEffect(() => {
     if (!active || cameraOpen) return
-
     let buf = ''
     let lastTime = 0
 
     const handleKey = (e) => {
       const now = Date.now()
-
-      // Si el gap entre teclas es > 100ms, reiniciamos (es usuario escribiendo)
-      if (now - lastTime > 100 && buf.length > 0) {
-        buf = ''
-      }
+      if (now - lastTime > 100 && buf.length > 0) buf = ''
       lastTime = now
 
       if (e.key === 'Enter') {
@@ -40,10 +41,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         }
         return
       }
-
-      if (e.key.length === 1) {
-        buf += e.key
-      }
+      if (e.key.length === 1) buf += e.key
     }
 
     window.addEventListener('keydown', handleKey)
@@ -52,76 +50,106 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
 
   async function handleScanned(barcode) {
     setScanning(true)
-    await onScan(barcode.trim())
-    setScanning(false)
+    try {
+      await onScan(barcode.trim())
+    } finally {
+      setScanning(false)
+    }
   }
 
-  // ===== CÁMARA (API de navegador) =====
-  const videoRef = useRef(null)
-  const streamRef = useRef(null)
-
-  async function openCamera() {
-    if (!('BarcodeDetector' in window)) {
-      console.log('BarcodeDetector not supported, using manual input');
-      setFallback(true);
-      return;
+  // ===== CÁMARA EN VIVO (solo si BarcodeDetector disponible) =====
+  async function openLiveCamera() {
+    setError('')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Tu navegador no soporta acceso a la cámara.')
+      return
     }
-    setCameraOpen(true);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      startBarcodeDetection();
+      })
+      streamRef.current = stream
+      setCameraOpen(true)
+
+      // Esperar al siguiente frame para que el video esté montado
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+        }
+
+        if ('BarcodeDetector' in window) {
+          detectorRef.current = new window.BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a', 'upc_e', 'code_39']
+          })
+          detectingRef.current = true
+          detectFrame()
+        }
+      }, 300)
     } catch (err) {
-      console.error('Camera error:', err);
-      alert('Error al acceder a la cámara. Asegúrate de dar los permisos necesarios.');
-      setCameraOpen(false);
-      setFallback(true);
+      console.error('Camera error:', err)
+      setError('No se pudo acceder a la cámara. Verificá los permisos del navegador.')
     }
   }
 
+  async function detectFrame() {
+    if (!detectingRef.current || !videoRef.current || !detectorRef.current) return
+    try {
+      const codes = await detectorRef.current.detect(videoRef.current)
+      if (codes.length > 0) {
+        const code = codes[0].rawValue
+        closeCamera()
+        await handleScanned(code)
+        return
+      }
+    } catch {}
+    if (detectingRef.current) requestAnimationFrame(detectFrame)
+  }
+
   function closeCamera() {
+    detectingRef.current = false
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
     setCameraOpen(false)
-    setFallback(false)
+    setError('')
   }
 
-  async function startBarcodeDetection() {
-    if (!('BarcodeDetector' in window)) {
-      console.log('BarcodeDetector not supported, using manual input');
-      setFallback(true);
-      return;
-    }
-    const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a', 'upc_e'] })
+  // ===== CAPTURA DE FOTO (fallback universal - funciona en iOS y Android) =====
+  async function handleFileCapture(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = '' // reset para permitir re-escaneo
 
-    const detect = async () => {
-      if (!videoRef.current || !cameraOpen) return
-      try {
-        const codes = await detector.detect(videoRef.current)
+    setScanning(true)
+    setError('')
+    try {
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a', 'upc_e', 'code_39']
+        })
+        const bitmap = await createImageBitmap(file)
+        const codes = await detector.detect(bitmap)
         if (codes.length > 0) {
-          const code = codes[0].rawValue
-          closeCamera()
-          await handleScanned(code)
-          return
+          await handleScanned(codes[0].rawValue)
+        } else {
+          setError('No se detectó ningún código. Intentá de nuevo con mejor iluminación.')
         }
-      } catch {}
-      if (videoRef.current) requestAnimationFrame(detect)
+      } else {
+        setError('Tu dispositivo no soporta detección automática. Ingresá el código manualmente.')
+      }
+    } catch (err) {
+      console.error('File scan error:', err)
+      setError('Error al procesar la imagen.')
+    } finally {
+      setScanning(false)
     }
-
-    requestAnimationFrame(detect)
   }
 
   return (
     <>
-      {/* Scan indicator */}
       {scanning && (
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -132,104 +160,112 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         </div>
       )}
 
-      {/* Camera button */}
-      {showCamera && (
-        <>
+      {showCamera && !scanning && (
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {/* Botón cámara en vivo - ideal en Android Chrome */}
           <button
             type="button"
-            onClick={openCamera}
+            onClick={openLiveCamera}
             className="btn btn-secondary btn-sm"
-            title="Escanear con cámara"
+            title="Escanear con cámara en tiempo real"
           >
-            <Camera size={16} /> Cámara
+            <Scan size={16} />
           </button>
-          { !fallback && (
-            <button
-              type="button"
-              onClick={() => setFallback(true)}
-              className="btn btn-secondary btn-sm"
-              title="Ingresar código manualmente"
-            >
-              <Hash size={16} /> Manual
-            </button>
-          )}
-        </>
+
+          {/* Botón captura de foto - funciona en iOS Safari y todos los móviles */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="btn btn-secondary btn-sm"
+            title="Tomar foto del código"
+          >
+            <Camera size={16} />
+          </button>
+
+          {/* Input de archivo oculto que abre la cámara nativa del celular */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileCapture}
+            style={{ display: 'none' }}
+          />
+        </div>
       )}
 
-      {/* Camera Modal */}
+      {error && (
+        <div style={{
+          color: 'var(--danger)', fontSize: '0.75rem',
+          padding: '4px 8px', background: 'var(--danger-soft)',
+          borderRadius: '6px', marginTop: '4px'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Modal cámara en vivo */}
       {cameraOpen && (
         <div style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.9)',
+          background: 'rgba(0,0,0,0.95)',
           zIndex: 2000,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '20px'
+          gap: '16px',
+          padding: '20px'
         }}>
-          <div style={{ position: 'relative' }}>
+          <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600 }}>
+            Apuntá la cámara al código de barras
+          </p>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '500px' }}>
             <video
               ref={videoRef}
               style={{
-                width: '100%', maxWidth: '500px',
-                borderRadius: 'var(--radius-lg)',
-                border: '2px solid var(--accent)'
+                width: '100%',
+                borderRadius: '12px',
+                border: '2px solid var(--accent)',
+                display: 'block'
               }}
               playsInline
               muted
+              autoPlay
             />
-            {/* Scan line animation */}
+            {/* Línea animada de escaneo */}
             <div style={{
-              position: 'absolute', top: '50%', left: '10%', right: '10%',
+              position: 'absolute', left: '10%', right: '10%',
               height: '2px', background: 'var(--accent)',
-              animation: 'scanLine 1.5s ease-in-out infinite',
-              boxShadow: '0 0 10px var(--accent)'
+              animation: 'scanLine 1.8s ease-in-out infinite',
+              boxShadow: '0 0 12px var(--accent)',
+              top: '20%'
             }} />
           </div>
 
-          <p style={{ color: 'white', fontSize: '0.9rem', opacity: 0.8 }}>
-            Apuntá la cámara al código de barras
-          </p>
+          {'BarcodeDetector' in window ? (
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem' }}>
+              Detección automática activa
+            </p>
+          ) : (
+            <p style={{ color: 'var(--warning)', fontSize: '0.85rem' }}>
+              ⚠ Tu navegador no soporta detección automática.<br />
+              Usá el botón 📷 para tomar una foto del código.
+            </p>
+          )}
 
           <button onClick={closeCamera} className="btn btn-danger">
             <X size={16} /> Cancelar
           </button>
         </div>
       )}
-      {fallback && (
-        <div className="flex items-center gap-2 mt-2">
-          <input
-            ref={fallbackInputRef}
-            type="text"
-            placeholder="Código de barras"
-            className="input input-sm"
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                handleScanned(e.currentTarget.value);
-                e.currentTarget.value = '';
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() => {
-              if (fallbackInputRef.current) {
-                handleScanned(fallbackInputRef.current.value);
-                fallbackInputRef.current.value = '';
-              }
-            }}
-          >
-            Escanear
-          </button>
-        </div>
-      )}
+
       <style>{`
         .spinning { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes scanLine {
           0% { top: 20%; }
-          50% { top: 80%; }
+          50% { top: 78%; }
           100% { top: 20%; }
         }
       `}</style>
@@ -238,7 +274,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
 }
 
 /**
- * Hook para input con escaneo de código de barras
+ * Hook para input con escaneo de código de barras (lector físico)
  */
 export function useBarcodeInput(onScan) {
   const inputRef = useRef(null)
@@ -249,7 +285,6 @@ export function useBarcodeInput(onScan) {
     let timeout = null
 
     const handleKey = (e) => {
-      // Solo procesar si el foco no está en un input/textarea
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
