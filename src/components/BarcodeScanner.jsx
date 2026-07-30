@@ -131,24 +131,26 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
 
       {/* Camera button */}
       {showCamera && (
-        <button
-          type="button"
-          onClick={openCamera}
-          className="btn btn-secondary btn-sm"
-          title="Escanear con cámara"
-        >
-          <Camera size={16} /> Cámara
-        </button>
-        { !fallback && (
+        <>
           <button
             type="button"
-            onClick={() => setFallback(true)}
+            onClick={openCamera}
             className="btn btn-secondary btn-sm"
-            title="Ingresar código manualmente"
+            title="Escanear con cámara"
           >
-            <Hash size={16} /> Manual
+            <Camera size={16} /> Cámara
           </button>
-        )}
+          { !fallback && (
+            <button
+              type="button"
+              onClick={() => setFallback(true)}
+              className="btn btn-secondary btn-sm"
+              title="Ingresar código manualmente"
+            >
+              <Hash size={16} /> Manual
+            </button>
+          )}
+        </>
       )}
 
       {/* Camera Modal */}
@@ -210,7 +212,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
             className="btn btn-primary btn-sm"
             onClick={() => {
               const inp = document.querySelector('input[placeholder="Código de barras"]');
-              if (inp) handleScanned((inp as HTMLInputElement).value);
+              if (inp) handleScanned(inp.value);
             }}
           >
             Escanear
