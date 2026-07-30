@@ -1,0 +1,22 @@
+# Plan de Implementación: Creador de Habilidades (Skill Creator)
+
+Este plan detalla la creación de una nueva habilidad denominada `creador-habilidades` que residirá en el espacio de trabajo. Esta habilidad proporcionará instrucciones y plantillas en español para facilitar la creación de futuras habilidades.
+
+## Cambios Propuestos
+
+### [Habilidad: creador-habilidades]
+
+Se creará la estructura necesaria en el directorio `.agent/skills/`.
+
+#### [NEW] [SKILL.md](file:///c:/Users/hp/Desktop/T.A.B.E/tabe/.agent/skills/creador-habilidades/SKILL.md)
+Archivo principal que contiene las instrucciones en español sobre cómo crear una habilidad, incluyendo la estructura de YAML frontmatter y la organización de carpetas.
+
+#### [NEW] [plantilla-habilidad.md](file:///c:/Users/hp/Desktop/T.A.B.E/tabe/.agent/skills/creador-habilidades/resources/plantilla-habilidad.md)
+Una plantilla base para facilitar la creación de nuevos archivos `SKILL.md`.
+
+## Plan de Verificación
+
+### Verificación Manual
+1.  Confirmar la existencia del archivo `.agent/skills/creador-habilidades/SKILL.md`.
+2.  Validar que el contenido de `SKILL.md` sigue el formato requerido (YAML frontmatter + Markdown).
+3.  Simular el uso de la habilidad solicitando al agente que cree una habilidad de prueba usando las nuevas instrucciones.

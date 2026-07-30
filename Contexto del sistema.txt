@@ -1,0 +1,35 @@
+Se quiere desarrollar un sistema para mejorar la eficiencia, organizacion y gestion de un Negocio escolar secundario, donde la prioridad es la agilidad uso rapido del sistema IU ituitible. 
+
+Los dueños de este negocio quieren llevar un registro del Stock, rentabilidad Costo, beneficio. 
+
+Quieren un Dashboard bien completo donde se pueda ver de forma visual a traves de grafico las ventas mensuales por un grafico de barra, indicando venta, ganancia. Mostrar en graficos de torta las categorias mas vendidas. Le llamaremos categoria a la parte General del producto como puede ser un ejemplo Bebidas, de ahi salga Coca Cola 500 ml, etc. Se desea buscar en la base de datos de un sistema colaborador los codigos de barra registrados en argentina para que una ves esvaneado el codigo del producto se auto complete el nombre. 
+
+El dueño del sistema quiere poder crear admins donde se le consultara a la hora de registrar el sistema el nombre del lugar, nombre del admin, correo del admin(se debe tener la constancia que su correo debe ser …..@nombreDelLugarIngresadoPreviamente, eso lo debe autocompletar el sistema) y contraseña del admin a crea.
+El usuario del dueño del sistema debe ser tomas@stackhard.com , contraseña: TOMAS2812.
+
+Los empleados deben poder tener la posibilidad de cargar productos, cargar ventas, escaneando productos con la camara de su Celular o con un lector de codigo de barras, el sistema debe tener una IU para el apartado de PC y una IU distinta y mejor diseñada para dispositivos de formato android o IOS, los admin deben tener la posibilidad de crear usuarios, darle permiso de acceso a esos usuarios. Para el apartado de Stock, margen ganancia precio hacer algo parecido a lo que ya esta echo en el stackhard sistema de ropa, ubicacion: C:\Users\Hp\Desktop\StackHard\Sistema Ropa 
+
+Debe haber un apartado llamado buffet donde se debe poder cargar los productos que se consumen ej Hamburguesa y los ingredientes por producto. Tener en cuenta que para hacer este apartado bien completo usar como sistema colaborador  stackhard sistema de comidas, ubicacion: C:\Users\Hp\Desktop\StackHard\ComidaYcafeteria.
+
+Se desea apartavos intuitivos echos por extenciones /apartado. Se va a usar: 
+Base de datos Supabase, token: , 
+Repositorio de github, token: ,
+
+Hay que tener en cuenta que los jefes tambien venden productos sin codigos como tortitas, entonces deben tener la posibilidad de poder vender ciertos productos sin codigos o crear un codigo.
+
+Se sabe que venden demasiado y todo junto a la ves ya que en el recreo se llena de niños por lo que ellos al escanear el codigo de barras en el apartado de ventas se debe hacer la venta en el momento dado que el tiempo es algo primordial en este sistema. Se debe detallar en la venta, hora en la que se hizo, usuario que lo vendio, producto que se vendio indicando el codigo y nombre del producto, cada ves que se realiza una venta se debe ir sumando en un apartado del apartado ventas, donde se pueda ver bien a detalle el total vendido, el total ganado (Vendido-Costo).
+
+
+Hacer un apartado deudores muy parecido al ya implementado en el sistema colaborador stackhard sistema de comidas, ubicacion: C:\Users\Hp\Desktop\StackHard\ComidaYcafeteria.
+
+Los usuarios que den de baja una venta debe verse detallado en un historial completo, este historial debe guardar TODOS los movimientos, que se hacen en el sistema, desde ventas hasta cambiar el estado de un producto ó modificar un producto, basicamente toda accion que se hace en el sistema debe ir al historial completo que es distinto al historial de ventas. Son normalmente 3 vendedores que escanearan productos, que se van a ir cargando en el apartado ventas en la computadora del local, a que voy con esto toda accion que se haga en el sistema debe verse impactada en el momento para todos los usuarios sin la necesidad de actualizar la pagina, esto no debe molestar al usuario que esta usando el sistema, en el apartado ventas se quiere un filtrado bien completo para que puedan buscar una venta de un/unos producto preciso si lo necesitan.
+
+Este sistema debe estar diseñado en React o lenguajes de programacion convenientes para llevar la buena ejecucion del sistema. Este sistema debe tener la posibilidad de ser una aplicacion descargable para todos los dispositivos.
+
+Se dese implementar un agente de IA para facilitar el buen uso de este sistema y ayudar a quienes trabajan en el sistema este agente de IA debe poder hacer todas las acciones del sistema y acciones que ayuden con el facil uso del sistema y hacer acciones mas completas del Sistema.
+
+En el apartado buffet si se desea deben poder llevar registro de los pedidos encargados para mejorar la organizacion de quienes trabajan en el buffet
+
+Correo del sistema
+sistemabufetmanuchi@gmail.com
+TOMAS2812
