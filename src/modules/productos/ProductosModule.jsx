@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   dbGetProducts, dbGetCategories, dbCreateProduct,
@@ -29,8 +29,16 @@ export default function ProductosModule() {
   const [modal, setModal] = useState({ open: false, edit: null })
   const [form, setForm] = useState(EMPTY_PRODUCT)
   const [saving, setSaving] = useState(false)
+  const barcodeInputRef = useRef(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [catModal, setCatModal] = useState({ open: false, name: '' })
+
+  // Focus barcode input when modal opens
+  useEffect(() => {
+    if (modal.open && barcodeInputRef.current) {
+      barcodeInputRef.current.focus()
+    }
+  }, [modal.open])
   const [savingCat, setSavingCat] = useState(false)
 
   async function handleSaveCategory() {
@@ -362,6 +370,7 @@ export default function ProductosModule() {
               <div style={{ display: 'flex', gap: '6px' }}>
                 <input
                   type="text"
+                  ref={barcodeInputRef}
                   value={form.barcode}
                   onChange={e => setForm(p => ({ ...p, barcode: e.target.value }))}
                   placeholder="Ej: 7790001234567"
@@ -370,7 +379,7 @@ export default function ProductosModule() {
                 <BarcodeScanner 
                   onScan={(code) => setForm(p => ({ ...p, barcode: code }))} 
                   active={modal.open} 
-                  showCamera={true} 
+                  showCamera={true}
                 />
                 <button
                   type="button"

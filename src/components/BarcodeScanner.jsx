@@ -11,6 +11,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
   const [buffer, setBuffer] = useState('')
   const [lastKeyTime, setLastKeyTime] = useState(0)
   const [scanning, setScanning] = useState(false)
+  const [fallback, setFallback] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
 
   // ===== LECTOR FÍSICO (USB HID) =====
@@ -59,20 +60,25 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
   const streamRef = useRef(null)
 
   async function openCamera() {
-    setCameraOpen(true)
+    if (!('BarcodeDetector' in window)) {
+      console.log('BarcodeDetector not supported, using manual input');
+      setFallback(true);
+      return;
+    }
+    setCameraOpen(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      })
-      streamRef.current = stream
+      });
+      streamRef.current = stream;
       if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
       }
-      startBarcodeDetection()
+      startBarcodeDetection();
     } catch (err) {
-      console.error('Camera error:', err)
-      setCameraOpen(false)
+      console.error('Camera error:', err);
+      setCameraOpen(false);
     }
   }
 
@@ -82,13 +88,14 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       streamRef.current = null
     }
     setCameraOpen(false)
+    setFallback(false)
   }
 
   async function startBarcodeDetection() {
     if (!('BarcodeDetector' in window)) {
-      // Fallback: usar ZXing o manual
-      console.log('BarcodeDetector not supported, using manual input')
-      return
+      console.log('BarcodeDetector not supported, using manual input');
+      setFallback(true);
+      return;
     }
     const detector = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128', 'qr_code', 'upc_a', 'upc_e'] })
 
@@ -132,6 +139,16 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         >
           <Camera size={16} /> Cámara
         </button>
+        { !fallback && (
+          <button
+            type="button"
+            onClick={() => setFallback(true)}
+            className="btn btn-secondary btn-sm"
+            title="Ingresar código manualmente"
+          >
+            <Hash size={16} /> Manual
+          </button>
+        )}
       )}
 
       {/* Camera Modal */}
@@ -175,7 +192,31 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
           </button>
         </div>
       )}
-
+      {fallback && (
+        <div className="flex items-center gap-2 mt-2">
+          <input
+            type="text"
+            placeholder="Código de barras"
+            className="input input-sm"
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                handleScanned(e.currentTarget.value);
+                e.currentTarget.value = '';
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              const inp = document.querySelector('input[placeholder="Código de barras"]');
+              if (inp) handleScanned((inp as HTMLInputElement).value);
+            }}
+          >
+            Escanear
+          </button>
+        </div>
+      )}
       <style>{`
         .spinning { animation: spin 1s linear infinite; }
         @keyframes scanLine {
