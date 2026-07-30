@@ -73,19 +73,18 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         await html5QrCode.start(
           { facingMode: 'environment' },
           {
-            fps: 10,
-            qrbox: { width: 250, height: 150 },
+            fps: 30,
+            qrbox: { width: 280, height: 100 },
             aspectRatio: 1.7,
-            formatsToSupport: [
-              0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 // todos los formatos
-            ]
+            disableFlip: true,
+            formatsToSupport: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // solo barcodes, sin QR
           },
           async (decodedText) => {
             await stopScanner(html5QrCode)
             setCameraOpen(false)
             await handleScanned(decodedText)
           },
-          () => {} // error silencioso frame a frame
+          () => {}
         )
       } catch (err) {
         console.error('Scanner error:', err)
@@ -94,8 +93,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       }
     }
 
-    // Pequeño delay para que el DOM esté listo
-    const t = setTimeout(startScanner, 300)
+    const t = setTimeout(startScanner, 100)
     return () => clearTimeout(t)
   }, [cameraOpen, containerId])
 
