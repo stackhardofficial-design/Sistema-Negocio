@@ -13,6 +13,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
   const [scanning, setScanning] = useState(false)
   const [fallback, setFallback] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
+  const fallbackInputRef = useRef(null)
 
   // ===== LECTOR FÍSICO (USB HID) =====
   // Los lectores de código de barras envían el código como si fuera un teclado muy rápido
@@ -78,7 +79,9 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       startBarcodeDetection();
     } catch (err) {
       console.error('Camera error:', err);
+      alert('Error al acceder a la cámara. Asegúrate de dar los permisos necesarios.');
       setCameraOpen(false);
+      setFallback(true);
     }
   }
 
@@ -197,6 +200,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       {fallback && (
         <div className="flex items-center gap-2 mt-2">
           <input
+            ref={fallbackInputRef}
             type="text"
             placeholder="Código de barras"
             className="input input-sm"
@@ -211,8 +215,10 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => {
-              const inp = document.querySelector('input[placeholder="Código de barras"]');
-              if (inp) handleScanned(inp.value);
+              if (fallbackInputRef.current) {
+                handleScanned(fallbackInputRef.current.value);
+                fallbackInputRef.current.value = '';
+              }
             }}
           >
             Escanear
