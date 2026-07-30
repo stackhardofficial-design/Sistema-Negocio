@@ -56,7 +56,7 @@ export default function VentasModule() {
   }, [tenantId])
 
   async function loadSales() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const data = await dbGetSales(tenantId, { dateFrom: today.toISOString(), limit: 200 })
     setSales(data)

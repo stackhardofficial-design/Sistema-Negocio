@@ -15,7 +15,7 @@ export default function StockModule() {
   const [view, setView] = useState('all') // 'all' | 'low' | 'out'
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const data = await dbGetProducts(tenantId, { includeInactive: false })
     setProducts(data)

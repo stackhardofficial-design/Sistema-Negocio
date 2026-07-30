@@ -31,7 +31,7 @@ export default function ProductosModule() {
   const [catModal, setCatModal] = useState({ open: false, name: '' })
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const [p, c] = await Promise.all([
       dbGetProducts(tenantId, { includeInactive: true }),

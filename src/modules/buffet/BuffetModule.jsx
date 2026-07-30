@@ -36,7 +36,7 @@ export default function BuffetModule() {
   const [customerName, setCustomerName] = useState('')
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const [bp, rp, ord] = await Promise.all([
       dbGetBuffetProducts(tenantId),

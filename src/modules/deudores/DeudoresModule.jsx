@@ -28,7 +28,7 @@ export default function DeudoresModule() {
   const [saving, setSaving] = useState(false)
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const data = await dbGetDebtors(tenantId, { includeSettled: showSettled })
     setDebtors(data)

@@ -55,6 +55,9 @@ function AppShell() {
               const t = await dbGetTenant(info.tenant_id)
               if (t) setTenant(t)
             }
+            if (info.role === 'super_admin') {
+              setCurrentModule('superadmin')
+            }
           }
         }
       } catch (err) {

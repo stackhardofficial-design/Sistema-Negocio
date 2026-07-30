@@ -25,7 +25,7 @@ export default function DashboardModule() {
   const [refreshing, setRefreshing] = useState(false)
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setRefreshing(true)
     const now = new Date()
     const from = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString()

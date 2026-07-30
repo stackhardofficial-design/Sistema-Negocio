@@ -42,7 +42,7 @@ export default function HistorialModule() {
   const [showFilters, setShowFilters] = useState(false)
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const opts = { limit: 500 }
     if (filterAction) opts.action = filterAction

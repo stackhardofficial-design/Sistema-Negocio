@@ -15,7 +15,7 @@ export default function ConfiguracionModule() {
   const [savingTenant, setSavingTenant] = useState(false)
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const data = await dbGetCategories(tenantId)
     setCategories(data)

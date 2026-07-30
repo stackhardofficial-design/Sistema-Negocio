@@ -19,7 +19,7 @@ export default function EmpleadosModule() {
   const [saving, setSaving] = useState(false)
 
   async function load() {
-    if (!tenantId) return
+    if (!tenantId) { setLoading(false); return; }
     setLoading(true)
     const data = await dbGetUsers(tenantId)
     setUsers(data)
