@@ -45,12 +45,15 @@ export default function ProductosModule() {
     if (!catModal.name.trim()) return toast('El nombre es obligatorio', 'warning')
     setSavingCat(true)
     try {
-      await dbCreateCategory(tenantId, catModal.name.trim())
-      toast('Categoría creada', 'success')
+      const result = await dbCreateCategory(tenantId, catModal.name.trim())
+      console.log('Category created:', result)
+      toast('Categoría creada ✓', 'success')
       setCatModal({ open: false, name: '' })
       load()
     } catch (err) {
-      toast(`Error: ${err.message}`, 'danger')
+      console.error('Error creating category:', err)
+      const msg = err?.message || err?.details || err?.hint || JSON.stringify(err)
+      toast(`Error al guardar categoría: ${msg}`, 'danger')
     } finally {
       setSavingCat(false)
     }
