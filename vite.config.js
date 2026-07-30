@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo.png'],
       manifest: {
-        name: 'Sistema Buffet Escolar',
-        short_name: 'Buffet',
+        name: 'StackHard Sistema Negocio',
+        short_name: 'Sistema Negocio',
         description: 'Sistema de gestión para buffet/quiosco escolar',
         theme_color: '#1a1d23',
         background_color: '#1a1d23',

@@ -69,7 +69,7 @@ export default function Sidebar() {
         {!sidebarCollapsed && (
           <div style={{ overflow: 'hidden' }}>
             <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-              {tenant?.name || 'Buffet Escolar'}
+              {tenant?.name || 'StackHard Sistema Negocio'}
             </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>StackHard</div>
           </div>

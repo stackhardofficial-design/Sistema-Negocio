@@ -64,7 +64,7 @@ export default function Login() {
             <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
-            Sistema Buffet
+            StackHard Sistema Negocio
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
             Gestión de quiosco escolar · StackHard
