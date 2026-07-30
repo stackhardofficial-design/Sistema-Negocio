@@ -2,29 +2,21 @@ import { useState, useRef, useEffect, useId } from 'react'
 import { Camera, X, Loader } from 'lucide-react'
 
 /**
- * BarcodeScanner ultra-rápido:
- * 1. Si BarcodeDetector está disponible (Chrome Android) → GPU-acelerado, ~instant
- * 2. Si no → ZXing/browser con requestAnimationFrame continuo
- *
- * Props:
- *   onScan(barcode: string)
- *   active - activa el listener de teclado (lector físico HID)
- *   showCamera - mostrar botón de cámara
+ * BarcodeScanner - usa html5-qrcode (que funciona) con config de máxima velocidad
  */
 export default function BarcodeScanner({ onScan, active = true, showCamera = false }) {
   const [scanning, setScanning] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
-  const videoRef = useRef(null)
-  const streamRef = useRef(null)
-  const stopRef = useRef(false)
+  const scannerRef = useRef(null)
+  const uid = useId().replace(/:/g, '')
+  const containerId = `barcode-reader-${uid}`
 
   // ===== LECTOR FÍSICO (USB HID) =====
   useEffect(() => {
     if (!active || cameraOpen) return
     let buf = ''
     let lastTime = 0
-
     const handleKey = (e) => {
       const now = Date.now()
       if (now - lastTime > 80 && buf.length > 0) buf = ''
@@ -35,7 +27,6 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       }
       if (e.key.length === 1) buf += e.key
     }
-
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [active, cameraOpen])
@@ -48,95 +39,78 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
   // ===== CÁMARA =====
   async function openCamera() {
     setError('')
-    stopRef.current = false
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      })
-      streamRef.current = stream
-      setCameraOpen(true)
-
-      // Esperar al mount del video
-      setTimeout(() => {
-        if (!videoRef.current) return
-        videoRef.current.srcObject = stream
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play()
-          startDetection()
-        }
-      }, 50)
-    } catch (err) {
-      console.error(err)
-      setError('No se pudo acceder a la cámara. Verificá los permisos.')
-    }
+    setCameraOpen(true)
   }
 
-  async function startDetection() {
-    if ('BarcodeDetector' in window) {
-      // ===== MODO 1: BarcodeDetector nativo (GPU-acelerado) =====
-      const detector = new window.BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e', 'code_39', 'code_93', 'itf', 'codabar']
-      })
+  useEffect(() => {
+    if (!cameraOpen) return
 
-      const detect = async () => {
-        if (stopRef.current || !videoRef.current) return
-        if (videoRef.current.readyState >= 2) {
-          try {
-            const codes = await detector.detect(videoRef.current)
-            if (codes.length > 0) {
-              closeCamera()
-              await handleScanned(codes[0].rawValue)
-              return
-            }
-          } catch {}
+    let html5QrCode = null
+    let stopped = false
+
+    const start = async () => {
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode')
+        if (stopped) return
+
+        html5QrCode = new Html5Qrcode(containerId)
+        scannerRef.current = html5QrCode
+
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          {
+            fps: 30,
+            qrbox: { width: 280, height: 100 },
+            aspectRatio: 1.77,
+            disableFlip: true,
+            formatsToSupport: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+          },
+          async (code) => {
+            if (stopped) return
+            stopped = true
+            await stop()
+            setCameraOpen(false)
+            await handleScanned(code)
+          },
+          () => {}
+        )
+      } catch (err) {
+        console.error('Scanner start error:', err)
+        if (!stopped) {
+          setError('No se pudo iniciar la cámara. Verificá los permisos.')
+          setCameraOpen(false)
         }
-        requestAnimationFrame(detect)
       }
-      requestAnimationFrame(detect)
-
-    } else {
-      // ===== MODO 2: ZXing como fallback =====
-      const { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } = await import('@zxing/library')
-
-      const hints = new Map()
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
-        BarcodeFormat.CODE_128, BarcodeFormat.CODE_39,
-        BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-        BarcodeFormat.ITF, BarcodeFormat.CODABAR
-      ])
-      hints.set(DecodeHintType.TRY_HARDER, true)
-
-      const reader = new BrowserMultiFormatReader(hints)
-
-      const decode = () => {
-        if (stopRef.current || !videoRef.current) return
-        if (videoRef.current.readyState >= 2) {
-          try {
-            const result = reader.decodeFromVideoElement(videoRef.current)
-            if (result) {
-              closeCamera()
-              handleScanned(result.getText())
-              return
-            }
-          } catch {}
-        }
-        requestAnimationFrame(decode)
-      }
-      requestAnimationFrame(decode)
     }
-  }
 
-  function closeCamera() {
-    stopRef.current = true
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
+    const stop = async () => {
+      if (html5QrCode) {
+        try {
+          const state = html5QrCode.getState()
+          if (state === 2) await html5QrCode.stop()
+        } catch {}
+        html5QrCode = null
+        scannerRef.current = null
+      }
+    }
+
+    const t = setTimeout(start, 150)
+
+    return () => {
+      clearTimeout(t)
+      stopped = true
+      stop()
+    }
+  }, [cameraOpen, containerId])
+
+  async function closeCamera() {
+    const sc = scannerRef.current
+    if (sc) {
+      try {
+        const state = sc.getState()
+        if (state === 2) await sc.stop()
+      } catch {}
+      scannerRef.current = null
     }
     setCameraOpen(false)
     setError('')
@@ -175,7 +149,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         </div>
       )}
 
-      {/* Modal escáner */}
+      {/* Modal del escáner */}
       {cameraOpen && (
         <div style={{
           position: 'fixed', inset: 0,
@@ -188,45 +162,15 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
           gap: '16px',
           padding: '20px'
         }}>
-          <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600, textAlign: 'center', margin: 0 }}>
+          <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
             Apuntá al código de barras
           </p>
 
-          <div style={{ position: 'relative', width: '100%', maxWidth: '500px' }}>
-            <video
-              ref={videoRef}
-              style={{ width: '100%', borderRadius: '12px', display: 'block', background: '#111' }}
-              playsInline
-              muted
-              autoPlay
-            />
-            {/* Guía visual de escaneo */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              pointerEvents: 'none'
-            }}>
-              <div style={{
-                border: '2px solid var(--accent)',
-                borderRadius: '8px',
-                width: '80%',
-                height: '80px',
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
-                position: 'relative'
-              }}>
-                {/* Línea de escaneo animada */}
-                <div style={{
-                  position: 'absolute',
-                  left: 0, right: 0,
-                  height: '2px',
-                  background: 'var(--accent)',
-                  animation: 'scanLine 1.2s ease-in-out infinite',
-                  boxShadow: '0 0 8px var(--accent)',
-                  top: 0
-                }} />
-              </div>
-            </div>
-          </div>
+          {/* Contenedor donde html5-qrcode renderiza el video */}
+          <div
+            id={containerId}
+            style={{ width: '100%', maxWidth: '500px', borderRadius: '12px', overflow: 'hidden' }}
+          />
 
           <button onClick={closeCamera} className="btn btn-danger" style={{ marginTop: '8px' }}>
             <X size={16} /> Cancelar
@@ -237,27 +181,27 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       <style>{`
         .spin-anim { animation: _spin 1s linear infinite; }
         @keyframes _spin { to { transform: rotate(360deg); } }
-        @keyframes scanLine {
-          0% { top: 0%; }
-          50% { top: calc(100% - 2px); }
-          100% { top: 0%; }
+
+        /* Ocultar controles innecesarios de html5-qrcode */
+        #${containerId} select,
+        #${containerId} img:not([src*="camera"]),
+        #${containerId} span:empty {
+          display: none !important;
+        }
+        #${containerId} video {
+          border-radius: 10px;
         }
       `}</style>
     </>
   )
 }
 
-/**
- * Hook para lector físico de código de barras
- */
 export function useBarcodeInput(onScan) {
   const inputRef = useRef(null)
-
   useEffect(() => {
     let buf = ''
     let lastTime = 0
     let timeout = null
-
     const handleKey = (e) => {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
@@ -275,10 +219,8 @@ export function useBarcodeInput(onScan) {
         timeout = setTimeout(() => { if (buf.length >= 3) onScan(buf.trim()); buf = '' }, 200)
       }
     }
-
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [onScan])
-
   return inputRef
 }
