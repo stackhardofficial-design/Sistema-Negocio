@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   dbGetProducts, dbGetCategories, dbCreateProduct,
-  dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity
+  dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity,
+  dbCreateCategory, dbDeleteCategory
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
@@ -30,6 +31,33 @@ export default function ProductosModule() {
   const [saving, setSaving] = useState(false)
   const [lookingUp, setLookingUp] = useState(false)
   const [catModal, setCatModal] = useState({ open: false, name: '' })
+  const [savingCat, setSavingCat] = useState(false)
+
+  async function handleSaveCategory() {
+    if (!catModal.name.trim()) return toast('El nombre es obligatorio', 'warning')
+    setSavingCat(true)
+    try {
+      await dbCreateCategory(tenantId, catModal.name.trim())
+      toast('Categoría creada', 'success')
+      setCatModal({ open: false, name: '' })
+      load()
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSavingCat(false)
+    }
+  }
+
+  async function handleDeleteCategory(id, name) {
+    if (!confirm(`¿Eliminar categoría "${name}"?`)) return
+    try {
+      await dbDeleteCategory(id)
+      toast('Categoría eliminada', 'success')
+      load()
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    }
+  }
 
   async function load() {
     if (!tenantId) { setLoading(false); return; }
@@ -179,16 +207,28 @@ export default function ProductosModule() {
               placeholder="Buscar por nombre o código..."
             />
           </div>
-          <select
-            value={filterCat}
-            onChange={e => setFilterCat(e.target.value)}
-            style={{ width: 'auto', minWidth: '150px' }}
-          >
-            <option value="">Todas las categorías</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <select
+              value={filterCat}
+              onChange={e => setFilterCat(e.target.value)}
+              style={{ width: 'auto', minWidth: '150px' }}
+            >
+              <option value="">Todas las categorías</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {isAdmin() && (
+              <button 
+                onClick={() => setCatModal({ open: true, name: '' })} 
+                className="btn btn-secondary"
+                style={{ padding: '8px 12px' }}
+                title="Gestionar categorías"
+              >
+                <Tag size={16} /> <span className="hide-on-mobile">Categorías</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Stats row */}
@@ -346,15 +386,27 @@ export default function ProductosModule() {
             </div>
             <div className="form-group">
               <label className="form-label">Categoría</label>
-              <select
-                value={form.category_id}
-                onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}
-              >
-                <option value="">Sin categoría</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <select
+                  value={form.category_id}
+                  onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}
+                  style={{ flex: 1 }}
+                >
+                  <option value="">Sin categoría</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setCatModal({ open: true, name: '' })}
+                  className="btn btn-secondary btn-sm"
+                  title="Gestionar categorías"
+                  style={{ flexShrink: 0 }}
+                >
+                  <Tag size={14} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -439,6 +491,47 @@ export default function ProductosModule() {
               </label>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* ===== MODAL Categorías ===== */}
+      <Modal
+        open={catModal.open}
+        onClose={() => setCatModal({ open: false, name: '' })}
+        title="Gestionar Categorías"
+        size="md"
+        footer={
+          <button onClick={() => setCatModal({ open: false, name: '' })} className="btn btn-secondary">Cerrar</button>
+        }
+      >
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <input
+            type="text"
+            value={catModal.name}
+            onChange={e => setCatModal(prev => ({ ...prev, name: e.target.value }))}
+            placeholder="Nueva categoría..."
+          />
+          <button onClick={handleSaveCategory} className="btn btn-primary" disabled={savingCat || !catModal.name.trim()}>
+            Agregar
+          </button>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <tbody>
+              {categories.length === 0 ? (
+                <tr><td style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No hay categorías</td></tr>
+              ) : categories.map(c => (
+                <tr key={c.id}>
+                  <td style={{ fontWeight: 500 }}>{c.name}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button onClick={() => handleDeleteCategory(c.id, c.name)} className="btn btn-danger btn-sm" title="Eliminar categoría">
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </Modal>
     </div>
