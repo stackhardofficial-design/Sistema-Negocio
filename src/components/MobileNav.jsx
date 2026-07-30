@@ -1,8 +1,9 @@
 import { useApp } from '../lib/AppContext'
 import {
   LayoutDashboard, ShoppingCart, Package, Coffee,
-  BookOpen, Users, ClipboardList
+  BookOpen, LogOut
 } from 'lucide-react'
+import { dbLogout } from '../lib/supabase'
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
@@ -14,6 +15,11 @@ const NAV_ITEMS = [
 
 export default function MobileNav() {
   const { currentModule, setCurrentModule } = useApp()
+
+  async function handleLogout() {
+    await dbLogout()
+    window.location.reload()
+  }
 
   return (
     <nav className="mobile-nav">
@@ -36,6 +42,14 @@ export default function MobileNav() {
             </button>
           )
         })}
+        <button
+          onClick={handleLogout}
+          className="mobile-nav-btn"
+          style={{ background: 'none', borderRadius: '10px', color: 'var(--danger)' }}
+        >
+          <LogOut />
+          Salir
+        </button>
       </div>
     </nav>
   )
