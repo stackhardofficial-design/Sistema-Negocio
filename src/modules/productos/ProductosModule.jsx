@@ -357,7 +357,6 @@ export default function ProductosModule() {
                 value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                 placeholder="Ej: Coca Cola 500ml"
-                autoFocus
               />
             </div>
           </div>
