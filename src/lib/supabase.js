@@ -230,10 +230,44 @@ export async function dbCancelSale(saleId, userId, reason) {
   return data
 }
 
+// ===== INGREDIENTS (Buffet) =====
+export async function dbGetIngredients(tenantId) {
+  const { data } = await sb.from('ingredients')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .order('name')
+  return data || []
+}
+
+export async function dbCreateIngredient(payload) {
+  const { data, error } = await sb.from('ingredients').insert(payload).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbUpdateIngredient(id, payload) {
+  const { data, error } = await sb.from('ingredients').update(payload).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbUpdateIngredientStock(id, quantity) {
+  const { data, error } = await sb.from('ingredients')
+    .update({ stock: quantity }).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbDeleteIngredient(id) {
+  const { error } = await sb.from('ingredients').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}
+
 // ===== BUFFET PRODUCTS =====
 export async function dbGetBuffetProducts(tenantId) {
   const { data } = await sb.from('buffet_products')
-    .select('*, buffet_ingredients(*, products(name, stock, unit_cost))')
+    .select('*, buffet_ingredients(*, ingredients(name, stock, cost_price, unit))')
     .eq('tenant_id', tenantId).eq('is_active', true).order('name')
   return data || []
 }
@@ -250,13 +284,13 @@ export async function dbUpdateBuffetProduct(id, payload) {
   return data
 }
 
-export async function dbSetBuffetIngredients(buffetProductId, ingredients) {
+export async function dbSetBuffetIngredients(buffetProductId, ingredientsList) {
   // Delete old
   await sb.from('buffet_ingredients').delete().eq('buffet_product_id', buffetProductId)
-  if (ingredients.length === 0) return
-  const rows = ingredients.map(i => ({
+  if (ingredientsList.length === 0) return
+  const rows = ingredientsList.map(i => ({
     buffet_product_id: buffetProductId,
-    product_id: i.product_id,
+    ingredient_id: i.ingredient_id,
     quantity: i.quantity,
     unit: i.unit || 'unidad'
   }))
