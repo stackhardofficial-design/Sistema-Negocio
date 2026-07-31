@@ -61,8 +61,8 @@ export default function EmpleadosModule() {
 
   async function handleCreateUser() {
     if (!newForm.name.trim()) return toast('El nombre es obligatorio', 'warning')
-    if (!newForm.email.trim() || !newForm.email.includes('@')) return toast('Email invÃ¡lido', 'warning')
-    if (!newForm.password || newForm.password.length < 6) return toast('La contraseÃ±a debe tener al menos 6 caracteres', 'warning')
+    if (!newForm.email.trim() || !newForm.email.includes('@')) return toast('Email inválido', 'warning')
+    if (!newForm.password || newForm.password.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'warning')
 
     setSaving(true)
     try {
@@ -130,7 +130,7 @@ export default function EmpleadosModule() {
           <div className="empty-state">
             <Users size={40} />
             <h3>Sin usuarios</h3>
-            <p style={{ fontSize: '0.85rem' }}>No hay empleados que coincidan con la bÃºsqueda</p>
+            <p style={{ fontSize: '0.85rem' }}>No hay empleados que coincidan con la búsqueda</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -188,7 +188,7 @@ export default function EmpleadosModule() {
       <Modal
         open={editModal.open}
         onClose={() => setEditModal({ open: false, user: null })}
-        title={`Editar Â· ${editModal.user?.name || editModal.user?.email}`}
+        title={`Editar · ${editModal.user?.name || editModal.user?.email}`}
         footer={
           <>
             <button onClick={() => setEditModal({ open: false, user: null })} className="btn btn-secondary">Cancelar</button>
@@ -205,7 +205,7 @@ export default function EmpleadosModule() {
         <div className="form-group">
           <label className="form-label">Rol</label>
           <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}>
-            {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} â€” {r.desc}</option>)}
+            {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
           </select>
         </div>
       </Modal>
@@ -230,14 +230,14 @@ export default function EmpleadosModule() {
             border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius-md)',
             fontSize: '0.82rem', color: 'var(--info)'
           }}>
-            El empleado recibirÃ¡ acceso al sistema con el email y contraseÃ±a que asignes.
+            El empleado recibirá acceso al sistema con el email y contraseña que asignes.
           </div>
           <div className="form-group">
             <label className="form-label">Nombre completo *</label>
             <input
               value={newForm.name}
               onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Ej: MarÃ­a GarcÃ­a"
+              placeholder="Ej: María García"
               autoFocus
             />
           </div>
@@ -252,13 +252,13 @@ export default function EmpleadosModule() {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">ContraseÃ±a *</label>
+            <label className="form-label">Contraseña *</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={newForm.password}
                 onChange={e => setNewForm(f => ({ ...f, password: e.target.value }))}
-                placeholder="MÃ­nimo 6 caracteres"
+                placeholder="Mínimo 6 caracteres"
                 style={{ paddingRight: '44px' }}
                 autoComplete="new-password"
               />
@@ -276,14 +276,14 @@ export default function EmpleadosModule() {
             </div>
             {newForm.password && newForm.password.length < 6 && (
               <small style={{ color: 'var(--danger)', fontSize: '0.75rem' }}>
-                MÃ­nimo 6 caracteres ({newForm.password.length}/6)
+                Mínimo 6 caracteres ({newForm.password.length}/6)
               </small>
             )}
           </div>
           <div className="form-group">
             <label className="form-label">Rol</label>
             <select value={newForm.role} onChange={e => setNewForm(f => ({ ...f, role: e.target.value }))}>
-              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} â€” {r.desc}</option>)}
+              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
             </select>
           </div>
         </div>

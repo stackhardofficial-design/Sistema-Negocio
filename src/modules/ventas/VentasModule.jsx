@@ -26,7 +26,7 @@ export default function VentasModule() {
   const barcodeRef = useRef(null)
 
   useEffect(() => {
-    // PequeÃ±o delay para que el teclado no aparezca automÃ¡ticamente en mobile
+    // Pequeño delay para que el teclado no aparezca automáticamente en mobile
     const t = setTimeout(() => barcodeRef.current?.focus(), 300)
     return () => clearTimeout(t)
   }, [])
@@ -65,7 +65,7 @@ export default function VentasModule() {
     try {
       const product = await dbGetProductByBarcode(tenantId, trimmed)
       if (!product) {
-        toast(`CÃ³digo "${trimmed}" no encontrado`, 'warning')
+        toast(`Código "${trimmed}" no encontrado`, 'warning')
         setBarcodeInput('')
         return
       }
@@ -133,7 +133,7 @@ export default function VentasModule() {
             <Zap size={18} color="var(--accent)" />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>Venta RÃ¡pida</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>Venta Rápida</div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Escanear â†’ venta al instante</div>
           </div>
         </div>
@@ -245,11 +245,11 @@ export default function VentasModule() {
             fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px',
             textAlign: 'center', lineHeight: 1.4
           }}>
-            AjustÃ¡ antes de escanear Â· o escaneÃ¡ <strong style={{ color: 'var(--text-secondary)' }}>N veces</strong> para N unidades
+            Ajustá antes de escanear · o escaneá <strong style={{ color: 'var(--text-secondary)' }}>N veces</strong> para N unidades
           </p>
         </div>
 
-        {/* ===== CÃ“DIGO DE BARRAS ===== */}
+        {/* ===== CÓDIGO DE BARRAS ===== */}
         <div style={{
           background: 'var(--bg-secondary)',
           border: `2px solid ${loading ? 'var(--accent)' : 'var(--border)'}`,
@@ -262,7 +262,7 @@ export default function VentasModule() {
             fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)',
             letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px'
           }}>
-            CÃ³digo de Barras
+            Código de Barras
           </div>
           <form onSubmit={handleBarcodeSubmit}>
             <div style={{ position: 'relative' }}>
@@ -275,7 +275,7 @@ export default function VentasModule() {
                 type="text"
                 value={barcodeInput}
                 onChange={e => setBarcodeInput(e.target.value)}
-                placeholder="Escanear o escribir cÃ³digo..."
+                placeholder="Escanear o escribir código..."
                 disabled={loading}
                 autoComplete="off"
                 autoCorrect="off"
@@ -317,7 +317,7 @@ export default function VentasModule() {
                   </>
                 ) : (
                   <>
-                    <Barcode size={16} /> Confirmar cÃ³digo
+                    <Barcode size={16} /> Confirmar código
                   </>
                 )}
               </button>
@@ -328,7 +328,7 @@ export default function VentasModule() {
           </form>
         </div>
 
-        {/* ===== CONFIRMACIÃ“N FLASH ===== */}
+        {/* ===== CONFIRMACIÓN FLASH ===== */}
         {confirmation && (
           <div
             className="fade-in"
@@ -418,7 +418,7 @@ export default function VentasModule() {
 
               {/* Countdown */}
               <div style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Se oculta en {Math.max(1, Math.ceil(progress / 20))}s Â· tocÃ¡ para descartar
+                Se oculta en {Math.max(1, Math.ceil(progress / 20))}s · tocá para descartar
               </div>
             </div>
           </div>
