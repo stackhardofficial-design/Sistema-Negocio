@@ -33,12 +33,7 @@ export default function ProductosModule() {
   const [lookingUp, setLookingUp] = useState(false)
   const [catModal, setCatModal] = useState({ open: false, name: '' })
 
-  // Focus barcode input when modal opens
-  useEffect(() => {
-    if (modal.open && barcodeInputRef.current) {
-      barcodeInputRef.current.focus()
-    }
-  }, [modal.open])
+
   const [savingCat, setSavingCat] = useState(false)
 
   async function handleSaveCategory() {
