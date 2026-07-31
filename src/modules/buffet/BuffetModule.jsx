@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
-  dbGetProducts, dbSetBuffetIngredients, dbGetBuffetOrders,
+  dbGetProducts, dbCreateProduct, dbUpdateProduct, dbUpdateProductStock,
+  dbSetBuffetIngredients, dbGetBuffetOrders,
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, subscribeToBuffetOrders, unsubscribe
-} from '../../lib/supabase'
+} from '../../lib/supabase.js'
 import Modal from '../../components/Modal'
 import { Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X } from 'lucide-react'
 
@@ -20,9 +21,9 @@ const STATUS_LABELS = {
 
 export default function BuffetModule() {
   const { tenantId, userInfo, toast, isAdmin } = useApp()
-  const [tab, setTab] = useState('productos') // productos | pedidos
+  const [tab, setTab] = useState('productos') // productos | pedidos | ingredientes
   const [buffetProducts, setBuffetProducts] = useState([])
-  const [rawProducts, setRawProducts] = useState([])
+  const [ingredients, setIngredients] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
@@ -35,16 +36,19 @@ export default function BuffetModule() {
   const [orderCart, setOrderCart] = useState([])
   const [customerName, setCustomerName] = useState('')
 
+  const [ingredientModal, setIngredientModal] = useState({ open: false, edit: null })
+  const [ingForm, setIngForm] = useState({ name: '', unit: 'unidad', cost_price: '', stock: '', min_stock: '' })
+
   async function load() {
     if (!tenantId) { setLoading(false); return; }
     setLoading(true)
-    const [bp, rp, ord] = await Promise.all([
+    const [bp, ings, ord] = await Promise.all([
       dbGetBuffetProducts(tenantId),
-      dbGetProducts(tenantId),
+      dbGetProducts(tenantId, { ingredientMode: 'only' }), // Fetch ONLY ingredients
       dbGetBuffetOrders(tenantId)
     ])
     setBuffetProducts(bp)
-    setRawProducts(rp)
+    setIngredients(ings)
     setOrders(ord)
     setLoading(false)
   }
@@ -121,7 +125,7 @@ export default function BuffetModule() {
       const updated = [...f.ingredients]
       updated[i] = { ...updated[i], [field]: value }
       if (field === 'product_id') {
-        const found = rawProducts.find(p => p.id === value)
+        const found = ingredients.find(p => p.id === value)
         if (found) updated[i].name = found.name
       }
       return { ...f, ingredients: updated }
@@ -130,6 +134,65 @@ export default function BuffetModule() {
 
   function removeIngredient(i) {
     setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, idx) => idx !== i) }))
+  }
+
+  // ===== INGREDIENTS CRUD =====
+  function openIngCreate() {
+    setIngForm({ name: '', unit: 'unidad', cost_price: '', stock: '', min_stock: '' })
+    setIngredientModal({ open: true, edit: null })
+  }
+
+  function openIngEdit(ing) {
+    setIngForm({
+      name: ing.name,
+      unit: ing.barcode === 'g' || ing.barcode === 'ml' ? ing.barcode : 'unidad', // Guardamos unidad en barcode como hack
+      cost_price: ing.cost_price,
+      stock: ing.stock,
+      min_stock: ing.min_stock
+    })
+    setIngredientModal({ open: true, edit: ing })
+  }
+
+  async function handleSaveIngredient() {
+    if (!ingForm.name.trim()) return toast('El nombre es obligatorio', 'warning')
+    setSaving(true)
+    try {
+      const payload = {
+        tenant_id: tenantId,
+        name: ingForm.name.trim(),
+        price: 0,
+        cost_price: parseFloat(ingForm.cost_price || 0),
+        stock: parseInt(ingForm.stock || 0),
+        min_stock: parseInt(ingForm.min_stock || 0),
+        description: '#INGREDIENT#', // ETIQUETA SECRETA
+        barcode: ingForm.unit, // Guardamos la unidad acá para no crear columnas
+        is_active: true
+      }
+      if (ingredientModal.edit) {
+        await dbUpdateProduct(ingredientModal.edit.id, payload)
+        toast('Ingrediente actualizado', 'success')
+      } else {
+        await dbCreateProduct(payload)
+        toast('Ingrediente creado', 'success')
+      }
+      setIngredientModal({ open: false, edit: null })
+      load()
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteIngredient(id) {
+    if (!confirm('¿Eliminar este ingrediente?')) return
+    try {
+      await dbUpdateProduct(id, { is_active: false })
+      toast('Ingrediente eliminado', 'info')
+      load()
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    }
   }
 
   // ===== ORDERS =====
@@ -183,6 +246,11 @@ export default function BuffetModule() {
               <Plus size={16} /> Nuevo producto
             </button>
           )}
+          {tab === 'ingredientes' && isAdmin() && (
+            <button onClick={openIngCreate} className="btn btn-primary">
+              <Plus size={16} /> Nuevo ingrediente
+            </button>
+          )}
         </div>
       </div>
 
@@ -190,8 +258,9 @@ export default function BuffetModule() {
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
           {[
-            { id: 'productos', label: '🍔 Productos del Buffet' },
-            { id: 'pedidos', label: `📋 Pedidos ${activeOrders.length > 0 ? `(${activeOrders.length})` : ''}` }
+            { id: 'pedidos', label: `📋 Pedidos ${activeOrders.length > 0 ? `(${activeOrders.length})` : ''}` },
+            { id: 'productos', label: '🍔 Productos Preparados' },
+            { id: 'ingredientes', label: '🥗 Ingredientes (Stock)' }
           ].map(t => (
             <button
               key={t.id}
@@ -253,6 +322,48 @@ export default function BuffetModule() {
                 )}
               </div>
             ))}
+          </div>
+        ) : tab === 'ingredientes' ? (
+          /* ===== INGREDIENTES ===== */
+          <div className="card" style={{ padding: '0' }}>
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Costo</th>
+                    <th>Stock</th>
+                    <th style={{ textAlign: 'right' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ingredients.length === 0 ? (
+                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '40px' }}>Sin ingredientes</td></tr>
+                  ) : ingredients.map(ing => (
+                    <tr key={ing.id}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{ing.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mínimo: {ing.min_stock} {ing.barcode || 'unidad'}</div>
+                      </td>
+                      <td>{formatMoney(ing.cost_price)}</td>
+                      <td>
+                        <span className={`badge ${ing.stock <= ing.min_stock ? 'badge-danger' : 'badge-success'}`}>
+                          {ing.stock} {ing.barcode || 'unidad'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {isAdmin() && (
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => openIngEdit(ing)} className="btn btn-secondary btn-sm"><Edit2 size={14}/></button>
+                            <button onClick={() => handleDeleteIngredient(ing.id)} className="btn btn-danger btn-sm"><Trash2 size={14}/></button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           /* ===== PEDIDOS ===== */
@@ -362,7 +473,7 @@ export default function BuffetModule() {
                   style={{ flex: 2 }}
                 >
                   <option value="">Seleccionar ingrediente...</option>
-                  {rawProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {ingredients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <input
                   type="number"
@@ -438,6 +549,53 @@ export default function BuffetModule() {
               ))}
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* ===== MODAL INGREDIENTE ===== */}
+      <Modal
+        open={ingredientModal.open}
+        onClose={() => setIngredientModal({ open: false, edit: null })}
+        title={ingredientModal.edit ? 'Editar ingrediente' : 'Nuevo ingrediente'}
+        footer={
+          <>
+            <button onClick={() => setIngredientModal({ open: false, edit: null })} className="btn btn-secondary">Cancelar</button>
+            <button onClick={handleSaveIngredient} className="btn btn-primary" disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="form-group">
+            <label className="form-label">Nombre del ingrediente *</label>
+            <input value={ingForm.name} onChange={e => setIngForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Unidad de medida</label>
+              <select value={ingForm.unit} onChange={e => setIngForm(f => ({ ...f, unit: e.target.value }))}>
+                <option value="unidad">Unidades</option>
+                <option value="gramos">Gramos</option>
+                <option value="ml">Mililitros</option>
+                <option value="porciones">Porciones</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Costo por {ingForm.unit}</label>
+              <input type="number" value={ingForm.cost_price} onChange={e => setIngForm(f => ({ ...f, cost_price: e.target.value }))} placeholder="0.00" />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Stock actual (entero)</label>
+              <input type="number" value={ingForm.stock} onChange={e => setIngForm(f => ({ ...f, stock: e.target.value }))} placeholder="0" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Stock mínimo (alerta)</label>
+              <input type="number" value={ingForm.min_stock} onChange={e => setIngForm(f => ({ ...f, min_stock: e.target.value }))} placeholder="0" />
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

@@ -111,7 +111,17 @@ export async function dbGetProducts(tenantId, opts = {}) {
   if (opts.search) q = q.ilike('name', `%${opts.search}%`)
   q = q.order('name')
   const { data } = await q
-  return data || []
+  
+  let results = data || []
+  
+  const mode = opts.ingredientMode || 'exclude'
+  if (mode === 'exclude') {
+    results = results.filter(p => p.description !== '#INGREDIENT#')
+  } else if (mode === 'only') {
+    results = results.filter(p => p.description === '#INGREDIENT#')
+  }
+  
+  return results
 }
 
 export async function dbGetProductByBarcode(tenantId, barcode) {
