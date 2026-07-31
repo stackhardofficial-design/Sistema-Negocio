@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 export default function Modal({ open, onClose, title, children, footer, size = 'md', noPad = false }) {
@@ -13,7 +14,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
 
   const maxWidths = { sm: '380px', md: '500px', lg: '700px', xl: '900px', full: '95vw' }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal fade-in" style={{ maxWidth: maxWidths[size] || maxWidths.md }}>
         <div className="modal-header">
@@ -36,6 +37,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
         )}
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
