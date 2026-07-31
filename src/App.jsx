@@ -8,6 +8,7 @@ import ToastContainer from './components/ToastContainer.jsx'
 import AIAgent from './components/AIAgent.jsx'
 import DashboardModule from './modules/dashboard/DashboardModule.jsx'
 import VentasModule from './modules/ventas/VentasModule.jsx'
+import RegistroVentasModule from './modules/ventas/RegistroVentasModule.jsx'
 import ProductosModule from './modules/productos/ProductosModule.jsx'
 import StockModule from './modules/stock/StockModule.jsx'
 import BuffetModule from './modules/buffet/BuffetModule.jsx'
@@ -21,6 +22,7 @@ import './index.css'
 const MODULE_MAP = {
   dashboard: DashboardModule,
   ventas: VentasModule,
+  registro_ventas: RegistroVentasModule,
   productos: ProductosModule,
   stock: StockModule,
   buffet: BuffetModule,

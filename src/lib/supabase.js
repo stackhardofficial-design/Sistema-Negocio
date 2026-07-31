@@ -230,6 +230,67 @@ export async function dbCancelSale(saleId, userId, reason) {
   return data
 }
 
+export async function dbUpdateSaleItem(saleItemId, newQuantity) {
+  // Obtener el item actual para calcular la diferencia de stock
+  const { data: item, error: itemErr } = await sb.from('sale_items')
+    .select('quantity, product_id, unit_price, unit_cost, sale_id')
+    .eq('id', saleItemId).single()
+  if (itemErr) throw itemErr
+
+  const diff = newQuantity - item.quantity
+  const newSubtotal = newQuantity * item.unit_price
+
+  // Actualizar el item
+  const { error: updateErr } = await sb.from('sale_items')
+    .update({ quantity: newQuantity, subtotal: newSubtotal })
+    .eq('id', saleItemId)
+  if (updateErr) throw updateErr
+
+  // Recalcular total de la venta
+  const { data: allItems } = await sb.from('sale_items')
+    .select('subtotal, unit_cost, quantity')
+    .eq('sale_id', item.sale_id)
+
+  const newTotal = (allItems || []).reduce((a, i) => a + Number(i.subtotal || 0), 0)
+  const newCost = (allItems || []).reduce((a, i) => a + (i.unit_cost || 0) * i.quantity, 0)
+
+  await sb.from('sales')
+    .update({ total_amount: newTotal, total_cost: newCost })
+    .eq('id', item.sale_id)
+
+  // Ajustar stock (si diff > 0 = más items, descontar más; si < 0 = devolver stock)
+  if (diff !== 0 && item.product_id) {
+    await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: diff })
+  }
+}
+
+export async function dbDeleteSaleItem(saleItemId) {
+  const { data: item, error: itemErr } = await sb.from('sale_items')
+    .select('quantity, product_id, unit_price, unit_cost, sale_id')
+    .eq('id', saleItemId).single()
+  if (itemErr) throw itemErr
+
+  const { error } = await sb.from('sale_items').delete().eq('id', saleItemId)
+  if (error) throw error
+
+  // Recalcular total
+  const { data: allItems } = await sb.from('sale_items')
+    .select('subtotal, unit_cost, quantity')
+    .eq('sale_id', item.sale_id)
+
+  const newTotal = (allItems || []).reduce((a, i) => a + Number(i.subtotal || 0), 0)
+  const newCost = (allItems || []).reduce((a, i) => a + (i.unit_cost || 0) * i.quantity, 0)
+
+  await sb.from('sales')
+    .update({ total_amount: newTotal, total_cost: newCost })
+    .eq('id', item.sale_id)
+
+  // Devolver stock
+  if (item.product_id) {
+    await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+  }
+}
+
 // ===== INGREDIENTS (Buffet) =====
 export async function dbGetIngredients(tenantId) {
   const { data } = await sb.from('ingredients')
