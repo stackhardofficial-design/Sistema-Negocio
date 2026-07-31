@@ -621,3 +621,63 @@ export function subscribeToBuffetOrders(tenantId, callback) {
 export function unsubscribe(channel) {
   if (channel) sb.removeChannel(channel)
 }
+
+// ===== FINANZAS (GASTOS) =====
+export async function dbGetExpenseCategories(tenantId) {
+  const { data } = await sb.from('expense_categories')
+    .select('*').eq('tenant_id', tenantId).eq('is_active', true).order('name')
+  return data || []
+}
+
+export async function dbCreateExpenseCategory(tenantId, name, icon = null) {
+  const { data, error } = await sb.from('expense_categories')
+    .insert({ tenant_id: tenantId, name, icon, is_active: true }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbUpdateExpenseCategory(id, payload) {
+  const { data, error } = await sb.from('expense_categories').update(payload).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbDeleteExpenseCategory(id) {
+  const { error } = await sb.from('expense_categories').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}
+
+export async function dbGetExpenses(tenantId, opts = {}) {
+  let q = sb.from('expenses')
+    .select('*, expense_categories(name, icon), users(name)')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+
+  if (opts.dateFrom) q = q.gte('expense_date', opts.dateFrom)
+  if (opts.dateTo) q = q.lte('expense_date', opts.dateTo)
+  if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
+
+  q = q.order('expense_date', { ascending: false }).order('created_at', { ascending: false })
+  
+  if (opts.limit) q = q.limit(opts.limit)
+
+  const { data } = await q
+  return data || []
+}
+
+export async function dbCreateExpense(payload) {
+  const { data, error } = await sb.from('expenses').insert(payload).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbUpdateExpense(id, payload) {
+  const { data, error } = await sb.from('expenses').update(payload).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbDeleteExpense(id) {
+  const { error } = await sb.from('expenses').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}

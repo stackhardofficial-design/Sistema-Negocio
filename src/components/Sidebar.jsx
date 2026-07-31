@@ -11,6 +11,7 @@ const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [] },
   { id: 'ventas', label: 'Ventas', icon: ShoppingCart, roles: [] },
   { id: 'registro_ventas', label: 'Registro Ventas', icon: Receipt, roles: [] },
+  { id: 'finanzas', label: 'Finanzas (Caja)', icon: TrendingUp, roles: ['admin'] },
   { id: 'productos', label: 'Productos', icon: Package, roles: [] },
   { id: 'stock', label: 'Stock', icon: Layers, roles: [] },
   { id: 'buffet', label: 'Buffet', icon: Coffee, roles: [] },

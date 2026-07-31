@@ -17,6 +17,7 @@ import EmpleadosModule from './modules/empleados/EmpleadosModule.jsx'
 import HistorialModule from './modules/historial/HistorialModule.jsx'
 import SuperAdminModule from './modules/superadmin/SuperAdminModule.jsx'
 import ConfiguracionModule from './modules/configuracion/ConfiguracionModule.jsx'
+import FinanzasModule from './modules/finanzas/FinanzasModule.jsx'
 import './index.css'
 
 const MODULE_MAP = {
@@ -26,6 +27,7 @@ const MODULE_MAP = {
   productos: ProductosModule,
   stock: StockModule,
   buffet: BuffetModule,
+  finanzas: FinanzasModule,
   deudores: DeudoresModule,
   empleados: EmpleadosModule,
   historial: HistorialModule,

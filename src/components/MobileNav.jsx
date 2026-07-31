@@ -3,7 +3,7 @@ import { useApp } from '../lib/AppContext'
 import {
   LayoutDashboard, ShoppingCart, Package, Layers,
   Coffee, Users, ClipboardList, Settings, LogOut,
-  Crown, BookOpen, Download, Receipt
+  Crown, BookOpen, Download, Receipt, TrendingUp
 } from 'lucide-react'
 import { dbLogout } from '../lib/supabase'
 
@@ -11,6 +11,7 @@ const MENU_ITEMS = [
   { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard, roles: [] },
   { id: 'ventas', label: 'Ventas', icon: ShoppingCart, roles: [] },
   { id: 'registro_ventas', label: 'Registro', icon: Receipt, roles: [] },
+  { id: 'finanzas', label: 'Caja', icon: TrendingUp, roles: ['admin'] },
   { id: 'productos', label: 'Productos', icon: Package, roles: [] },
   { id: 'stock', label: 'Stock', icon: Layers, roles: [] },
   { id: 'buffet', label: 'Buffet', icon: Coffee, roles: [] },
