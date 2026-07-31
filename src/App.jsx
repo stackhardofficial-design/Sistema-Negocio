@@ -107,9 +107,6 @@ function AppShell() {
 
       {/* AI Agent Floating */}
       <AIAgent />
-
-      {/* Toast Notifications */}
-      <ToastContainer />
     </div>
   )
 }
@@ -118,6 +115,7 @@ export default function App() {
   return (
     <AppProvider>
       <AppShell />
+      <ToastContainer />
     </AppProvider>
   )
 }

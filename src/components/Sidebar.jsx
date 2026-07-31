@@ -30,7 +30,13 @@ export default function Sidebar() {
   )
 
   async function handleLogout() {
-    await dbLogout()
+    try {
+      await dbLogout()
+    } catch (e) {
+      console.error('Logout error:', e)
+    } finally {
+      window.location.reload()
+    }
   }
 
   return (

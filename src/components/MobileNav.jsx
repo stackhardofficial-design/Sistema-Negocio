@@ -43,8 +43,13 @@ export default function MobileNav() {
   }
 
   async function handleLogout() {
-    await dbLogout()
-    window.location.reload()
+    try {
+      await dbLogout()
+    } catch (e) {
+      console.error('Logout error:', e)
+    } finally {
+      window.location.reload()
+    }
   }
 
   const visibleItems = MENU_ITEMS.filter(item =>
