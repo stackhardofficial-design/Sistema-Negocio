@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
-  dbGetProducts, dbCreateProduct, dbUpdateProduct, dbUpdateProductStock,
+  dbGetIngredients, dbCreateIngredient, dbUpdateIngredient, dbDeleteIngredient,
   dbSetBuffetIngredients, dbGetBuffetOrders,
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, subscribeToBuffetOrders, unsubscribe
-} from '../../lib/supabase.js'
+} from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X } from 'lucide-react'
 
@@ -44,7 +44,7 @@ export default function BuffetModule() {
     setLoading(true)
     const [bp, ings, ord] = await Promise.all([
       dbGetBuffetProducts(tenantId),
-      dbGetProducts(tenantId, { ingredientMode: 'only' }), // Fetch ONLY ingredients
+      dbGetIngredients(tenantId),
       dbGetBuffetOrders(tenantId)
     ])
     setBuffetProducts(bp)
@@ -71,10 +71,10 @@ export default function BuffetModule() {
       cost_price: bp.cost_price || '',
       description: bp.description || '',
       ingredients: (bp.buffet_ingredients || []).map(i => ({
-        product_id: i.product_id,
+        ingredient_id: i.ingredient_id,
         quantity: i.quantity,
         unit: i.unit || 'unidad',
-        name: i.products?.name
+        name: i.ingredients?.name
       }))
     })
     setProductModal({ open: true, edit: bp })
@@ -116,7 +116,7 @@ export default function BuffetModule() {
   function addIngredient() {
     setForm(f => ({
       ...f,
-      ingredients: [...f.ingredients, { product_id: '', quantity: 1, unit: 'unidad', name: '' }]
+      ingredients: [...f.ingredients, { ingredient_id: '', quantity: 1, unit: 'unidad', name: '' }]
     }))
   }
 
@@ -124,9 +124,12 @@ export default function BuffetModule() {
     setForm(f => {
       const updated = [...f.ingredients]
       updated[i] = { ...updated[i], [field]: value }
-      if (field === 'product_id') {
+      if (field === 'ingredient_id') {
         const found = ingredients.find(p => p.id === value)
-        if (found) updated[i].name = found.name
+        if (found) {
+          updated[i].name = found.name
+          updated[i].unit = found.unit
+        }
       }
       return { ...f, ingredients: updated }
     })
@@ -145,7 +148,7 @@ export default function BuffetModule() {
   function openIngEdit(ing) {
     setIngForm({
       name: ing.name,
-      unit: ing.barcode === 'g' || ing.barcode === 'ml' ? ing.barcode : 'unidad', // Guardamos unidad en barcode como hack
+      unit: ing.unit,
       cost_price: ing.cost_price,
       stock: ing.stock,
       min_stock: ing.min_stock
@@ -160,19 +163,16 @@ export default function BuffetModule() {
       const payload = {
         tenant_id: tenantId,
         name: ingForm.name.trim(),
-        price: 0,
+        unit: ingForm.unit,
         cost_price: parseFloat(ingForm.cost_price || 0),
-        stock: parseInt(ingForm.stock || 0),
-        min_stock: parseInt(ingForm.min_stock || 0),
-        description: '#INGREDIENT#', // ETIQUETA SECRETA
-        barcode: ingForm.unit, // Guardamos la unidad acá para no crear columnas
-        is_active: true
+        stock: parseFloat(ingForm.stock || 0),
+        min_stock: parseFloat(ingForm.min_stock || 0)
       }
       if (ingredientModal.edit) {
-        await dbUpdateProduct(ingredientModal.edit.id, payload)
+        await dbUpdateIngredient(ingredientModal.edit.id, payload)
         toast('Ingrediente actualizado', 'success')
       } else {
-        await dbCreateProduct(payload)
+        await dbCreateIngredient(payload)
         toast('Ingrediente creado', 'success')
       }
       setIngredientModal({ open: false, edit: null })
@@ -187,7 +187,7 @@ export default function BuffetModule() {
   async function handleDeleteIngredient(id) {
     if (!confirm('¿Eliminar este ingrediente?')) return
     try {
-      await dbUpdateProduct(id, { is_active: false })
+      await dbDeleteIngredient(id)
       toast('Ingrediente eliminado', 'info')
       load()
     } catch (err) {
@@ -343,12 +343,12 @@ export default function BuffetModule() {
                     <tr key={ing.id}>
                       <td>
                         <div style={{ fontWeight: 500 }}>{ing.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mínimo: {ing.min_stock} {ing.barcode || 'unidad'}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mínimo: {ing.min_stock} {ing.unit}</div>
                       </td>
                       <td>{formatMoney(ing.cost_price)}</td>
                       <td>
                         <span className={`badge ${ing.stock <= ing.min_stock ? 'badge-danger' : 'badge-success'}`}>
-                          {ing.stock} {ing.barcode || 'unidad'}
+                          {ing.stock} {ing.unit}
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
@@ -468,8 +468,8 @@ export default function BuffetModule() {
             {form.ingredients.map((ing, i) => (
               <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
                 <select
-                  value={ing.product_id}
-                  onChange={e => updateIngredient(i, 'product_id', e.target.value)}
+                  value={ing.ingredient_id}
+                  onChange={e => updateIngredient(i, 'ingredient_id', e.target.value)}
                   style={{ flex: 2 }}
                 >
                   <option value="">Seleccionar ingrediente...</option>
@@ -588,7 +588,7 @@ export default function BuffetModule() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Stock actual (entero)</label>
+              <label className="form-label">Stock actual</label>
               <input type="number" value={ingForm.stock} onChange={e => setIngForm(f => ({ ...f, stock: e.target.value }))} placeholder="0" />
             </div>
             <div className="form-group">
