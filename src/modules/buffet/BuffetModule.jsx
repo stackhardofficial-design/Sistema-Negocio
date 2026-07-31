@@ -345,7 +345,7 @@ export default function BuffetModule() {
                         <div style={{ fontWeight: 500 }}>{ing.name}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mínimo: {ing.min_stock} {ing.unit}</div>
                       </td>
-                      <td>{formatMoney(ing.cost_price)}</td>
+                      <td>{ing.cost_price > 0 ? formatMoney(ing.cost_price) : <span style={{color: 'var(--text-muted)'}}>-</span>}</td>
                       <td>
                         <span className={`badge ${ing.stock <= ing.min_stock ? 'badge-danger' : 'badge-success'}`}>
                           {ing.stock} {ing.unit}
@@ -582,7 +582,7 @@ export default function BuffetModule() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Costo por {ingForm.unit}</label>
+              <label className="form-label">Costo por {ingForm.unit} (opcional)</label>
               <input type="number" value={ingForm.cost_price} onChange={e => setIngForm(f => ({ ...f, cost_price: e.target.value }))} placeholder="0.00" />
             </div>
           </div>
