@@ -34,7 +34,25 @@ export async function dbGetTenant(tenantId) {
   return data
 }
 
+export async function dbGetUniqueSlug(baseSlug) {
+  // Verificar si el slug ya existe y generar uno único con sufijo numérico
+  let slug = baseSlug
+  let attempt = 0
+  while (attempt < 20) {
+    const { data } = await sb.from('tenants').select('id').eq('slug', slug).maybeSingle()
+    if (!data) return slug // Slug disponible
+    attempt++
+    slug = `${baseSlug}${attempt}`
+  }
+  // Fallback con timestamp si hay demasiados intentos
+  return `${baseSlug}${Date.now().toString(36)}`
+}
+
 export async function dbCreateTenant(payload) {
+  // Asegurar slug único antes de insertar
+  if (payload.slug) {
+    payload = { ...payload, slug: await dbGetUniqueSlug(payload.slug) }
+  }
   const { data, error } = await sb.from('tenants').insert(payload).select().single()
   if (error) throw error
   return data
@@ -54,7 +72,7 @@ export async function dbGetUsers(tenantId) {
 }
 
 export async function dbCreateUser(email, password, userData) {
-  // Create auth user + profile via admin API (called from edge function or service role)
+  // DEPRECATED: admin.createUser requiere service role key, usar dbCreateUserForTenant
   const { data, error } = await sb.auth.admin.createUser({
     email,
     password,
@@ -63,6 +81,37 @@ export async function dbCreateUser(email, password, userData) {
   })
   if (error) throw error
   return data
+}
+
+// Crear usuario dentro de un tenant usando signUp (funciona con anon key)
+export async function dbCreateUserForTenant(tenantId, email, password, name, role = 'vendedor') {
+  // 1. Verificar que el email no esté ya registrado en este tenant
+  const { data: existing } = await sb.from('users').select('id').eq('email', email).maybeSingle()
+  if (existing) throw new Error(`El email ${email} ya está registrado en el sistema`)
+
+  // 2. Crear en auth
+  const { data: authData, error: authErr } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name, tenant_id: tenantId }
+    }
+  })
+  if (authErr) throw authErr
+  if (!authData?.user) throw new Error('No se pudo crear el usuario en Auth')
+
+  // 3. Insertar perfil en tabla users
+  const { data: userRow, error: profileErr } = await sb.from('users').insert({
+    id: authData.user.id,
+    tenant_id: tenantId,
+    email,
+    name: name || email.split('@')[0],
+    role,
+    is_active: true
+  }).select().single()
+
+  if (profileErr) throw profileErr
+  return userRow
 }
 
 export async function dbUpdateUser(id, payload) {
@@ -223,10 +272,26 @@ export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCo
 }
 
 export async function dbCancelSale(saleId, userId, reason) {
+  // Primero obtener los items para restaurar stock
+  const { data: items } = await sb.from('sale_items')
+    .select('product_id, quantity')
+    .eq('sale_id', saleId)
+
+  // Marcar como cancelada
   const { data, error } = await sb.from('sales')
     .update({ status: 'cancelled', cancel_reason: reason, cancelled_by: userId, cancelled_at: new Date().toISOString() })
     .eq('id', saleId).select().single()
   if (error) throw error
+
+  // Restaurar stock: pasar cantidad negativa a decrement_stock (lo suma de vuelta)
+  if (items && items.length > 0) {
+    for (const item of items) {
+      if (item.product_id) {
+        await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+      }
+    }
+  }
+
   return data
 }
 
@@ -285,9 +350,9 @@ export async function dbDeleteSaleItem(saleItemId) {
     .update({ total_amount: newTotal, total_cost: newCost })
     .eq('id', item.sale_id)
 
-  // Devolver stock
-  if (item.product_id) {
-    await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+  // Restaurar stock (cantidad negativa → la función SQL suma de vuelta)
+  if (item.product_id && item.quantity > 0) {
+    await sb.rpc('increment_stock', { p_product_id: item.product_id, p_qty: item.quantity })
   }
 }
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant } from '../../lib/supabase'
-import { sb } from '../../lib/supabase'
+import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant, dbCreateUserForTenant, sb } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Crown, Plus, Building2, Users, Edit2, Search, ToggleLeft } from 'lucide-react'
 
@@ -41,6 +40,7 @@ export default function SuperAdminModule() {
     if (!form.name.trim()) return toast('El nombre del lugar es obligatorio', 'warning')
 
     setSaving(true)
+    let createdTenantId = null
     try {
       if (modal.edit) {
         await dbUpdateTenant(modal.edit.id, {
@@ -49,34 +49,43 @@ export default function SuperAdminModule() {
         })
         toast('Negocio actualizado', 'success')
       } else {
-        // Crear tenant
-        const slug = form.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+        // Validar contraseña mínima si se va a crear usuario
+        if (form.admin_email && form.admin_password && form.admin_password.length < 6) {
+          return toast('La contraseña debe tener al menos 6 caracteres', 'warning')
+        }
+
+        // Generar slug base (se hace único en dbCreateTenant automáticamente)
+        const slugBase = form.name.trim()
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
+          .replace(/\s+/g, '')
+          .replace(/[^a-z0-9]/g, '')
+          || 'negocio'
+
+        // Crear tenant (slug único garantizado)
         const tenant = await dbCreateTenant({
           name: form.name.trim(),
-          slug,
+          slug: slugBase,
           plan: form.plan || 'basic',
           is_active: true
         })
+        createdTenantId = tenant.id
 
-        // Crear usuario admin
+        // Crear usuario admin si se proporcionaron credenciales
         if (form.admin_email && form.admin_password) {
-          const { data: authData, error } = await sb.auth.admin.createUser({
-            email: form.admin_email,
-            password: form.admin_password,
-            email_confirm: true,
-            user_metadata: { name: form.admin_name, tenant_id: tenant.id }
-          })
-          if (error) throw error
-
-          // Insert user profile
-          await sb.from('users').insert({
-            id: authData.user.id,
-            tenant_id: tenant.id,
-            email: form.admin_email,
-            name: form.admin_name || 'Admin',
-            role: 'admin',
-            is_active: true
-          })
+          try {
+            await dbCreateUserForTenant(
+              tenant.id,
+              form.admin_email.trim(),
+              form.admin_password,
+              form.admin_name || 'Admin',
+              'admin'
+            )
+          } catch (userErr) {
+            // Rollback: eliminar el tenant creado si el usuario falló
+            await sb.from('tenants').delete().eq('id', tenant.id)
+            throw new Error(`Error al crear el usuario admin: ${userErr.message}`)
+          }
         }
 
         toast(`Negocio "${form.name}" creado exitosamente`, 'success')
@@ -91,6 +100,7 @@ export default function SuperAdminModule() {
       setSaving(false)
     }
   }
+
 
   function openEdit(t) {
     setForm({ name: t.name, admin_email: '', admin_password: '', admin_name: '', plan: t.plan || 'basic' })

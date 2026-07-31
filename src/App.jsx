@@ -39,7 +39,7 @@ function AppShell() {
     userInfo, setUserInfo,
     tenantId, setTenantId,
     tenant, setTenant,
-    currentModule
+    currentModule, setCurrentModule
   } = useApp()
   const [loading, setLoading] = useState(true)
 

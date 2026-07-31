@@ -195,16 +195,28 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC)
 -- FUNCTIONS
 -- =====================================================
 
--- Descontar stock al vender
-CREATE OR REPLACE FUNCTION decrement_stock(p_product_id UUID, p_qty INTEGER)
+-- Descontar stock al vender (p_qty positivo = descontar, negativo = devolver)
+CREATE OR REPLACE FUNCTION decrement_stock(p_product_id UUID, p_qty NUMERIC)
 RETURNS VOID AS $$
 BEGIN
   UPDATE products
-  SET stock = GREATEST(0, stock - p_qty),
+  SET stock = GREATEST(0, COALESCE(stock, 0) - p_qty),
       updated_at = NOW()
-  WHERE id = p_product_id AND stock IS NOT NULL;
+  WHERE id = p_product_id;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Devolver stock al anular venta o eliminar item (siempre suma)
+CREATE OR REPLACE FUNCTION increment_stock(p_product_id UUID, p_qty NUMERIC)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE products
+  SET stock = COALESCE(stock, 0) + p_qty,
+      updated_at = NOW()
+  WHERE id = p_product_id;
+END;
+$$ LANGUAGE plpgsql;
+
 
 -- Actualizar deuda total de un deudor
 CREATE OR REPLACE FUNCTION update_debtor_total(p_debtor_id UUID)
