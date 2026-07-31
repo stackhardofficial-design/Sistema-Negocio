@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetProducts, dbUpdateProductStock, dbLogActivity } from '../../lib/supabase'
-import { Layers, AlertTriangle, Search, Edit2, Check, X, RefreshCw } from 'lucide-react'
+import { dbGetProducts, dbUpdateProductStock, dbLogActivity, dbCreateExpense, dbEnsureExpenseCategory } from '../../lib/supabase'
+import Modal from '../../components/Modal'
+import { Layers, AlertTriangle, Search, Edit2, Check, X, RefreshCw, ShoppingCart } from 'lucide-react'
 
 function formatMoney(n) { return `$${Number(n || 0).toLocaleString('es-AR')}` }
 
@@ -13,6 +14,10 @@ export default function StockModule() {
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [view, setView] = useState('all') // 'all' | 'low' | 'out'
+
+  // Modal de confirmación de gasto por ingreso de mercadería
+  const [expenseConfirmModal, setExpenseConfirmModal] = useState({ open: false, product: null, added: 0, cost: 0, newStock: 0 })
+  const [savingExpense, setSavingExpense] = useState(false)
 
   async function load() {
     if (!tenantId) { setLoading(false); return; }
@@ -27,16 +32,68 @@ export default function StockModule() {
   async function saveStock(product) {
     const newStock = parseInt(editValue)
     if (isNaN(newStock) || newStock < 0) return toast('Valor inválido', 'warning')
+
+    const oldStock = product.stock ?? 0
+    const added = newStock - oldStock
+    const hasCost = product.cost_price && product.cost_price > 0
+
+    // Si se están sumando unidades y el producto tiene costo registrado → mostrar modal de confirmación
+    if (added > 0 && hasCost) {
+      setExpenseConfirmModal({
+        open: true,
+        product,
+        added,
+        cost: product.cost_price * added,
+        newStock
+      })
+      return
+    }
+
+    // Si no hay costo o se está reduciendo stock → guardar directo
+    await commitStockUpdate(product, newStock, oldStock)
+  }
+
+  async function commitStockUpdate(product, newStock, oldStock) {
     try {
       await dbUpdateProductStock(product.id, newStock)
       await dbLogActivity(tenantId, userInfo?.id, 'update_stock', 'product', product.id, {
-        name: product.name, old: product.stock, new: newStock
+        name: product.name, old: oldStock, new: newStock
       })
       toast(`Stock de "${product.name}" actualizado a ${newStock}`, 'success')
       setEditingId(null)
       load()
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
+    }
+  }
+
+  async function handleConfirmExpense(registerExpense) {
+    const { product, added, cost, newStock } = expenseConfirmModal
+    const oldStock = product.stock ?? 0
+    setSavingExpense(true)
+    try {
+      // 1. Actualizar el stock
+      await commitStockUpdate(product, newStock, oldStock)
+
+      // 2. Si el usuario confirmó registrar el gasto en Caja
+      if (registerExpense) {
+        const category = await dbEnsureExpenseCategory(tenantId, 'Compra Mercadería')
+        await dbCreateExpense({
+          tenant_id: tenantId,
+          user_id: userInfo?.id,
+          category_id: category.id,
+          amount: cost,
+          description: `${added} u. de "${product.name}" (costo unitario: ${formatMoney(product.cost_price)})`,
+          expense_date: new Date().toISOString().split('T')[0],
+          expense_type: 'variable'
+        })
+        toast(`Gasto de ${formatMoney(cost)} registrado en Caja ✓`, 'success')
+      }
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSavingExpense(false)
+      setExpenseConfirmModal({ open: false, product: null, added: 0, cost: 0, newStock: 0 })
     }
   }
 
@@ -121,6 +178,7 @@ export default function StockModule() {
                   <th>Producto</th>
                   <th>Código</th>
                   <th>Categoría</th>
+                  <th style={{ textAlign: 'right' }}>Costo unit.</th>
                   <th style={{ textAlign: 'right' }}>Stock actual</th>
                   <th style={{ textAlign: 'right' }}>Stock mín.</th>
                   <th>Estado</th>
@@ -140,6 +198,9 @@ export default function StockModule() {
                       </td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         {p.categories?.name || '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontSize: '0.85rem', color: p.cost_price > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {p.cost_price > 0 ? formatMoney(p.cost_price) : '—'}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {isEditing ? (
@@ -196,6 +257,56 @@ export default function StockModule() {
           </div>
         )}
       </div>
+
+      {/* Modal Confirmación Gasto por Mercadería */}
+      <Modal
+        open={expenseConfirmModal.open}
+        onClose={() => !savingExpense && setExpenseConfirmModal({ open: false, product: null, added: 0, cost: 0, newStock: 0 })}
+        title="Ingreso de Mercadería Detectado"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{
+            padding: '16px', borderRadius: '12px',
+            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+            display: 'flex', gap: '12px', alignItems: 'flex-start'
+          }}>
+            <ShoppingCart size={22} color="var(--accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+                Estás sumando {expenseConfirmModal.added} unidades de<br />
+                <span style={{ color: 'var(--accent)' }}>"{expenseConfirmModal.product?.name}"</span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                Costo unitario registrado: <strong>{formatMoney(expenseConfirmModal.product?.cost_price)}</strong><br />
+                <span style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                  Costo total de esta compra: {formatMoney(expenseConfirmModal.cost)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            ¿Querés registrar automáticamente <strong>{formatMoney(expenseConfirmModal.cost)}</strong> como gasto de <em>Compra de Mercadería</em> en la Caja?
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              onClick={() => handleConfirmExpense(true)}
+              disabled={savingExpense}
+              className="btn btn-primary"
+            >
+              {savingExpense ? 'Guardando...' : `✓ Sí, registrar gasto de ${formatMoney(expenseConfirmModal.cost)}`}
+            </button>
+            <button
+              onClick={() => handleConfirmExpense(false)}
+              disabled={savingExpense}
+              className="btn btn-secondary"
+            >
+              Solo actualizar stock, sin registrar gasto
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

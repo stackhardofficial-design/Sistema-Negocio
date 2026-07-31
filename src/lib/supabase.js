@@ -681,3 +681,19 @@ export async function dbDeleteExpense(id) {
   const { error } = await sb.from('expenses').update({ is_active: false }).eq('id', id)
   if (error) throw error
 }
+
+// Busca o crea una categoría de gastos por nombre (útil para gastos automáticos de stock)
+export async function dbEnsureExpenseCategory(tenantId, name) {
+  const { data: existing } = await sb.from('expense_categories')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('name', name)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (existing) return existing
+  const { data, error } = await sb.from('expense_categories')
+    .insert({ tenant_id: tenantId, name, is_active: true })
+    .select().single()
+  if (error) throw error
+  return data
+}

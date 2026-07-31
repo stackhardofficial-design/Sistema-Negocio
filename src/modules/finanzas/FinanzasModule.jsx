@@ -38,7 +38,7 @@ export default function FinanzasModule() {
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
-  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toISOString().split('T')[0] })
+  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toISOString().split('T')[0], expense_type: 'variable' })
   
   const [catModal, setCatModal] = useState({ open: false, edit: null })
   const [catForm, setCatForm] = useState({ name: '' })
@@ -85,7 +85,8 @@ export default function FinanzasModule() {
           category_id: expenseForm.category_id,
           amount: parseFloat(expenseForm.amount),
           description: expenseForm.description?.trim(),
-          expense_date: expenseForm.expense_date
+          expense_date: expenseForm.expense_date,
+          expense_type: expenseForm.expense_type || 'variable'
         })
         toast('Gasto registrado', 'success')
       }
@@ -138,6 +139,8 @@ export default function FinanzasModule() {
   // ===== CÁLCULOS =====
   const totalIngresos = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0)
   const totalGastos = expenses.reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalFijos = expenses.filter(e => e.expense_type === 'fixed').reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalVariables = expenses.filter(e => !e.expense_type || e.expense_type === 'variable').reduce((acc, e) => acc + Number(e.amount), 0)
   const gananciaNeta = totalIngresos - totalGastos
 
   // Agrupar para planilla semanal
@@ -223,7 +226,7 @@ export default function FinanzasModule() {
             {/* TAB: RESUMEN */}
             {activeTab === 'resumen' && (
               <div className="fade-in">
-                <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '24px' }}>
+                <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: '24px' }}>
                   <div className="kpi-card">
                     <div className="kpi-label" style={{ color: 'var(--success)' }}>
                       <TrendingUp size={16} /> Ingresos (Ventas)
@@ -233,10 +236,17 @@ export default function FinanzasModule() {
                   </div>
                   <div className="kpi-card">
                     <div className="kpi-label" style={{ color: 'var(--danger)' }}>
-                      <TrendingDown size={16} /> Egresos (Gastos)
+                      <TrendingDown size={16} /> Egresos Totales
                     </div>
                     <div className="kpi-value">{formatMoney(totalGastos)}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Total de salidas registradas</div>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>
+                        🔒 Fijos: {formatMoney(totalFijos)}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>
+                        🔄 Variables: {formatMoney(totalVariables)}
+                      </span>
+                    </div>
                   </div>
                   <div className="kpi-card" style={{ background: gananciaNeta >= 0 ? 'var(--success-soft)' : 'var(--danger-soft)' }}>
                     <div className="kpi-label" style={{ color: gananciaNeta >= 0 ? 'var(--success)' : 'var(--danger)' }}>
@@ -295,8 +305,15 @@ export default function FinanzasModule() {
                           </div>
                           <div>
                             <div style={{ fontWeight: 600, fontSize: '1rem' }}>{exp.expense_categories?.name || 'Sin categoría'}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '8px' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
                               <span>{formatDate(exp.expense_date)}</span>
+                              <span style={{
+                                padding: '1px 7px', borderRadius: '5px', fontWeight: 600,
+                                background: exp.expense_type === 'fixed' ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.15)',
+                                color: exp.expense_type === 'fixed' ? 'var(--info)' : 'var(--warning)'
+                              }}>
+                                {exp.expense_type === 'fixed' ? '🔒 Fijo' : '🔄 Variable'}
+                              </span>
                               {exp.description && <span>· {exp.description}</span>}
                               {exp.users?.name && <span>· {exp.users.name}</span>}
                             </div>
@@ -447,6 +464,42 @@ export default function FinanzasModule() {
           </div>
 
           <div className="form-group">
+            <label className="form-label">Tipo de gasto</label>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setExpenseForm({ ...expenseForm, expense_type: 'variable' })}
+                disabled={saving}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px', border: '2px solid',
+                  borderColor: expenseForm.expense_type !== 'fixed' ? 'var(--warning)' : 'var(--border)',
+                  background: expenseForm.expense_type !== 'fixed' ? 'rgba(245,158,11,0.1)' : 'transparent',
+                  color: expenseForm.expense_type !== 'fixed' ? 'var(--warning)' : 'var(--text-muted)',
+                  cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s'
+                }}
+              >
+                🔄 Variable
+                <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: '2px', opacity: 0.8 }}>Mercadería, insumos</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpenseForm({ ...expenseForm, expense_type: 'fixed' })}
+                disabled={saving}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px', border: '2px solid',
+                  borderColor: expenseForm.expense_type === 'fixed' ? 'var(--info)' : 'var(--border)',
+                  background: expenseForm.expense_type === 'fixed' ? 'rgba(59,130,246,0.1)' : 'transparent',
+                  color: expenseForm.expense_type === 'fixed' ? 'var(--info)' : 'var(--text-muted)',
+                  cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s'
+                }}
+              >
+                🔒 Fijo
+                <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: '2px', opacity: 0.8 }}>Alquiler, sueldo fijo</div>
+              </button>
+            </div>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Descripción (Opcional)</label>
             <input
               type="text"
@@ -459,7 +512,7 @@ export default function FinanzasModule() {
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             <button onClick={handleSaveExpense} disabled={saving || categories.length === 0} className="btn btn-primary" style={{ flex: 1 }}>
-              {saving ? 'Guardando...' : 'Guardar Gasto'}
+              {saving ? 'Guardando...' : `Guardar Gasto ${expenseForm.expense_type === 'fixed' ? '🔒 Fijo' : '🔄 Variable'}`}
             </button>
             <button onClick={() => setExpenseModal({ open: false, edit: null })} disabled={saving} className="btn btn-secondary">
               Cancelar
