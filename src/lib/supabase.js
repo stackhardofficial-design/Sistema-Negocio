@@ -71,6 +71,11 @@ export async function dbGetUsers(tenantId) {
   return data || []
 }
 
+export async function dbGetAllUsersWithTenants() {
+  const { data } = await sb.from('users').select('*, tenants(name)').order('created_at', { ascending: false })
+  return data || []
+}
+
 export async function dbCreateUser(email, password, userData) {
   // DEPRECATED: admin.createUser requiere service role key, usar dbCreateUserForTenant
   const { data, error } = await sb.auth.admin.createUser({

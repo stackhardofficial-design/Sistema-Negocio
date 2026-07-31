@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetUsers, dbUpdateUser, dbDeleteUser, dbLogActivity, dbCreateUserForTenant } from '../../lib/supabase'
+import { dbGetUsers, dbUpdateUser, dbDeleteUser, dbLogActivity, dbCreateUserForTenant, dbGetAllUsersWithTenants } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Users, Plus, Edit2, UserX, UserCheck, Search, Shield, Eye, EyeOff } from 'lucide-react'
 
@@ -12,10 +12,13 @@ const ROLES = [
 const EMPTY_NEW_USER = { name: '', email: '', password: '', role: 'vendedor' }
 
 export default function EmpleadosModule() {
-  const { tenantId, userInfo, toast, isAdmin } = useApp()
+  const { tenantId, userInfo, toast, isAdmin, isSuperAdmin } = useApp()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+
+  // Para Jefes expandidos (super_admin)
+  const [expanded, setExpanded] = useState({})
 
   // Modal editar
   const [editModal, setEditModal] = useState({ open: false, user: null })
@@ -29,18 +32,26 @@ export default function EmpleadosModule() {
   const [saving, setSaving] = useState(false)
 
   async function load() {
-    if (!tenantId) { setLoading(false); return }
     setLoading(true)
-    const data = await dbGetUsers(tenantId)
+    let data = []
+    if (isSuperAdmin()) {
+      data = await dbGetAllUsersWithTenants()
+    } else if (tenantId) {
+      data = await dbGetUsers(tenantId)
+    }
     setUsers(data)
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [tenantId])
+  useEffect(() => { load() }, [tenantId, userInfo])
 
   function openEdit(u) {
     setEditForm({ name: u.name || '', role: u.role || 'vendedor', is_active: u.is_active ?? true })
     setEditModal({ open: true, user: u })
+  }
+
+  function toggleExpanded(id) {
+    setExpanded(p => ({ ...p, [id]: !p[id] }))
   }
 
   async function handleUpdate() {
@@ -104,6 +115,13 @@ export default function EmpleadosModule() {
     (u.email || '').toLowerCase().includes(search.toLowerCase())
   )
 
+  const groupedUsers = isSuperAdmin() ? filtered.reduce((acc, u) => {
+    if (!u.tenant_id) return acc
+    if (!acc[u.tenant_id]) acc[u.tenant_id] = { name: u.tenants?.name || 'Sin negocio', users: [] }
+    acc[u.tenant_id].users.push(u)
+    return acc
+  }, {}) : {}
+
   return (
     <div className="fade-in">
       <div className="module-header">
@@ -111,7 +129,7 @@ export default function EmpleadosModule() {
           <span className="icon-wrap"><Users size={20} /></span>
           Empleados & Usuarios
         </h1>
-        {isAdmin() && (
+        {isAdmin() && !isSuperAdmin() && (
           <button onClick={() => { setNewForm(EMPTY_NEW_USER); setShowPassword(false); setNewModal(true) }} className="btn btn-primary">
             <Plus size={16} /> Nuevo empleado
           </button>
@@ -131,6 +149,78 @@ export default function EmpleadosModule() {
             <Users size={40} />
             <h3>Sin usuarios</h3>
             <p style={{ fontSize: '0.85rem' }}>No hay empleados que coincidan con la búsqueda</p>
+          </div>
+        ) : isSuperAdmin() ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {Object.entries(groupedUsers).map(([tId, group]) => {
+              const jefe = group.users.find(u => u.role === 'admin')
+              const empleados = group.users.filter(u => u.role !== 'admin')
+              const isExp = expanded[tId]
+
+              return (
+                <div key={tId} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  <div 
+                    onClick={() => toggleExpanded(tId)}
+                    style={{ 
+                      padding: '14px', display: 'flex', alignItems: 'center', gap: '14px', 
+                      cursor: 'pointer', background: 'var(--bg-secondary)',
+                      borderBottom: isExp ? '1px solid var(--border)' : 'none'
+                    }}
+                  >
+                    <div style={{
+                      width: '44px', height: '44px', borderRadius: '12px',
+                      background: 'var(--accent-soft)', color: 'var(--accent)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 700, fontSize: '1.2rem', flexShrink: 0
+                    }}>
+                      {(jefe?.name || group.name).charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {jefe?.name || 'Sin jefe asignado'} 
+                        <span className="badge badge-warning">Jefe</span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Negocio: {group.name} · {empleados.length} empleados</div>
+                    </div>
+                    <div style={{ color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 500 }}>
+                      {isExp ? 'Ocultar' : 'Ver empleados'}
+                    </div>
+                  </div>
+                  
+                  {isExp && (
+                    <div style={{ padding: '14px', background: 'var(--bg)' }}>
+                      {empleados.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {empleados.map(u => (
+                            <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)', opacity: u.is_active ? 1 : 0.6 }}>
+                              <div style={{
+                                width: '32px', height: '32px', borderRadius: '50%',
+                                background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontWeight: 700, fontSize: '0.9rem', flexShrink: 0
+                              }}>
+                                {(u.name || u.email || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>{u.name || 'Sin nombre'}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.email}</div>
+                              </div>
+                              <span className={`badge ${u.is_active ? 'badge-success' : 'badge-neutral'}`}>
+                                {u.is_active ? 'Activo' : 'Inactivo'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '10px' }}>
+                          Este negocio no tiene empleados registrados
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
