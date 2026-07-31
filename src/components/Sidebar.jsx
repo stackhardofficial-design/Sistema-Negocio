@@ -25,9 +25,15 @@ export default function Sidebar() {
   const { currentModule, setCurrentModule, sidebarCollapsed, setSidebarCollapsed,
     userInfo, tenant, hasRole } = useApp()
 
-  const visibleItems = MENU_ITEMS.filter(item =>
-    item.roles.length === 0 || item.roles.some(r => hasRole(r))
-  )
+  const visibleItems = MENU_ITEMS.filter(item => {
+    // Si el item requiere roles específicos, chequeamos si el usuario tiene alguno
+    if (item.roles.length > 0) return item.roles.some(r => hasRole(r))
+    
+    // Si el item NO tiene roles especificados (roles: []), 
+    // lo mostramos para admin y vendedor, pero NO para super_admin,
+    // ya que el super_admin no tiene tenantId y vería los datos mezclados.
+    return !hasRole('super_admin')
+  })
 
   async function handleLogout() {
     try {

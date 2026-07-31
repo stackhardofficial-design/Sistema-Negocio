@@ -52,9 +52,10 @@ export default function MobileNav() {
     }
   }
 
-  const visibleItems = MENU_ITEMS.filter(item =>
-    item.roles.length === 0 || item.roles.some(r => hasRole(r))
-  )
+  const visibleItems = MENU_ITEMS.filter(item => {
+    if (item.roles.length > 0) return item.roles.some(r => hasRole(r))
+    return !hasRole('super_admin')
+  })
 
   return (
     <nav className="mobile-nav">
