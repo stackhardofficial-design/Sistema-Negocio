@@ -98,25 +98,11 @@ CREATE TABLE IF NOT EXISTS buffet_products (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ===== INGREDIENTS (Buffet) =====
-CREATE TABLE IF NOT EXISTS ingredients (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  unit TEXT DEFAULT 'unidad',
-  cost_price DECIMAL(10, 2) DEFAULT 0,
-  stock DECIMAL(10, 3) DEFAULT 0,
-  min_stock DECIMAL(10, 3) DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ===== BUFFET INGREDIENTS =====
 CREATE TABLE IF NOT EXISTS buffet_ingredients (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   buffet_product_id UUID REFERENCES buffet_products(id) ON DELETE CASCADE,
-  ingredient_id UUID REFERENCES ingredients(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   quantity DECIMAL(10, 3) DEFAULT 1,
   unit TEXT DEFAULT 'unidad',
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -236,7 +222,6 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE buffet_products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ingredients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE buffet_ingredients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE buffet_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE buffet_order_items ENABLE ROW LEVEL SECURITY;
@@ -281,11 +266,7 @@ CREATE POLICY "tenant_sale_items" ON sale_items FOR ALL USING (
 
 -- Buffet
 CREATE POLICY "tenant_buffet_products" ON buffet_products FOR ALL USING (tenant_id = get_user_tenant_id() OR is_super_admin());
-CREATE POLICY "tenant_ingredients" ON ingredients FOR ALL USING (tenant_id = get_user_tenant_id() OR is_super_admin());
 CREATE POLICY "tenant_buffet_ingredients" ON buffet_ingredients FOR ALL USING (
-  EXISTS (SELECT 1 FROM buffet_products bp WHERE bp.id = buffet_ingredients.buffet_product_id AND bp.tenant_id = get_user_tenant_id())
-  OR is_super_admin()
-);
   EXISTS (SELECT 1 FROM buffet_products bp WHERE bp.id = buffet_ingredients.buffet_product_id AND bp.tenant_id = get_user_tenant_id())
   OR is_super_admin()
 );
