@@ -11,6 +11,15 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
   realtime: { params: { eventsPerSecond: 20 } }
 })
 
+// Cliente secundario EXCLUSIVO para crear usuarios sin sobreescribir la sesión actual
+const sbAuth = createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false
+  }
+})
+
 // ===== AUTH =====
 export const dbLogin = (email, password) =>
   sb.auth.signInWithPassword({ email, password })
@@ -94,8 +103,8 @@ export async function dbCreateUserForTenant(tenantId, email, password, name, rol
   const { data: existing } = await sb.from('users').select('id').eq('email', email).maybeSingle()
   if (existing) throw new Error(`El email ${email} ya está registrado en el sistema`)
 
-  // 2. Crear en auth
-  const { data: authData, error: authErr } = await sb.auth.signUp({
+  // 2. Crear en auth usando sbAuth (cliente secundario sin persistencia)
+  const { data: authData, error: authErr } = await sbAuth.auth.signUp({
     email,
     password,
     options: {
