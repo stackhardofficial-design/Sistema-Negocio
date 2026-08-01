@@ -23,7 +23,7 @@ const AVAILABLE_MODULES = [
   { id: 'configuracion', label: 'Configuración' }
 ]
 
-const EMPTY_NEW_USER = { name: '', email: '', password: '', role: 'vendedor', access_modules: ['dashboard', 'ventas', 'registro_ventas', 'productos', 'stock', 'buffet', 'deudores'] }
+const EMPTY_NEW_USER = { name: '', email_prefix: '', password: '', role: 'vendedor', access_modules: ['dashboard', 'ventas', 'registro_ventas', 'productos', 'stock', 'buffet', 'deudores'] }
 
 export default function EmpleadosModule() {
   const { tenantId, userInfo, toast, isAdmin, isSuperAdmin } = useApp()
@@ -106,22 +106,25 @@ export default function EmpleadosModule() {
   }
 
   async function handleCreateUser() {
+    const userDomain = userInfo?.email ? userInfo.email.split('@')[1] : 'email.com'
+    const fullEmail = `${(newForm.email_prefix || '').trim().toLowerCase()}@${userDomain}`
+
     if (!newForm.name.trim()) return toast('El nombre es obligatorio', 'warning')
-    if (!newForm.email.trim() || !newForm.email.includes('@')) return toast('Email inválido', 'warning')
+    if (!(newForm.email_prefix || '').trim()) return toast('El prefijo de email es obligatorio', 'warning')
     if (!newForm.password || newForm.password.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'warning')
 
     setSaving(true)
     try {
       const userRow = await dbCreateUserForTenant(
         tenantId,
-        newForm.email.trim().toLowerCase(),
+        fullEmail,
         newForm.password,
         newForm.name.trim(),
-        newForm.role,
+        'vendedor',
         newForm.access_modules
       )
       await dbLogActivity(tenantId, userInfo?.id, 'create', 'user', userRow.id, {
-        name: newForm.name, email: newForm.email, role: newForm.role
+        name: newForm.name, email: fullEmail, role: 'vendedor'
       })
       toast(`Usuario "${newForm.name}" creado correctamente`, 'success')
       setNewModal(false)
@@ -328,12 +331,7 @@ export default function EmpleadosModule() {
           <label className="form-label">Nombre</label>
           <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Nombre completo" autoFocus />
         </div>
-        <div className="form-group">
-          <label className="form-label">Rol</label>
-          <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}>
-            {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
-          </select>
-        </div>
+
         <div className="form-group">
           <label className="form-label">Accesos a Módulos (Apartados)</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
@@ -384,13 +382,24 @@ export default function EmpleadosModule() {
           </div>
           <div className="form-group">
             <label className="form-label">Email *</label>
-            <input
-              type="email"
-              value={newForm.email}
-              onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))}
-              placeholder="empleado@email.com"
-              autoComplete="off"
-            />
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={newForm.email_prefix || ''}
+                onChange={e => setNewForm(f => ({ ...f, email_prefix: e.target.value.replace(/\s+/g, '').replace(/@.*/, '') }))}
+                placeholder="juan"
+                autoComplete="off"
+                style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0, flex: 1 }}
+              />
+              <div style={{ 
+                padding: '0 14px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', 
+                borderLeft: 'none', height: '42px', display: 'flex', alignItems: 'center', 
+                borderTopRightRadius: 'var(--radius)', borderBottomRightRadius: 'var(--radius)',
+                color: 'var(--text-muted)', fontSize: '0.9rem'
+              }}>
+                @{userInfo?.email ? userInfo.email.split('@')[1] : 'email.com'}
+              </div>
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Contraseña *</label>
@@ -421,12 +430,7 @@ export default function EmpleadosModule() {
               </small>
             )}
           </div>
-          <div className="form-group">
-            <label className="form-label">Rol</label>
-            <select value={newForm.role} onChange={e => setNewForm(f => ({ ...f, role: e.target.value }))}>
-              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
-            </select>
-          </div>
+
           <div className="form-group">
             <label className="form-label">Accesos a Módulos (Apartados)</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
