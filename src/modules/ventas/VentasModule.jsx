@@ -7,6 +7,23 @@ import {
   Barcode, CheckCircle2, Package, Zap, Hash, Minus, Plus
 } from 'lucide-react'
 
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime) // 880Hz
+    gain.gain.setValueAtTime(0.1, ctx.currentTime)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.1) // 100ms
+  } catch(e) {
+    console.error('Audio beep failed', e)
+  }
+}
+
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
 }
@@ -19,6 +36,7 @@ export default function VentasModule() {
   const [loading, setLoading] = useState(false)
   const [confirmation, setConfirmation] = useState(null)
   const [progress, setProgress] = useState(100)
+  const [flashSuccess, setFlashSuccess] = useState(false)
 
   const timerRef = useRef(null)
   const progressRef = useRef(null)
@@ -78,6 +96,9 @@ export default function VentasModule() {
       await dbLogActivity(tenantId, userInfo?.id, 'create', 'sale', sale.id, {
         product: product.name, barcode: product.barcode, quantity: qty, total
       })
+      playBeep()
+      setFlashSuccess(true)
+      setTimeout(() => setFlashSuccess(false), 300)
       showConfirmation({
         product, quantity: qty, total,
         seller: userInfo?.name || userInfo?.email?.split('@')[0] || 'Vendedor'
@@ -286,8 +307,9 @@ export default function VentasModule() {
                   fontSize: '1rem',
                   height: '52px',
                   borderRadius: '12px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg)',
+                  border: flashSuccess ? '2px solid var(--success)' : '1px solid var(--border)',
+                  background: flashSuccess ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg)',
+                  transition: 'all 0.15s ease',
                   color: 'var(--text-primary)',
                   width: '100%',
                   boxSizing: 'border-box',
