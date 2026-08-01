@@ -59,10 +59,11 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         await html5QrCode.start(
           { facingMode: 'environment' },
           {
-            fps: 30,
-            qrbox: { width: 280, height: 100 },
-            aspectRatio: 1.77,
-            disableFlip: true,
+            fps: 60,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            },
+            disableFlip: false, // Permitir escaneo inverso si el celu está al revés
             formatsToSupport: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
           },
           async (code) => {
