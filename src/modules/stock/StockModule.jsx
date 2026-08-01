@@ -46,21 +46,20 @@ export default function StockModule() {
 
     const oldStock = product.stock ?? 0
     const added = newStock - oldStock
-    const hasCost = product.cost_price && product.cost_price > 0
-
-    // Si se están sumando unidades y el producto tiene costo registrado → mostrar modal de confirmación
-    if (added > 0 && hasCost) {
+    // Si se están sumando unidades mostrar modal de confirmación, tenga costo previo o no
+    if (added > 0) {
+      const suggestedCost = (product.cost_price && product.cost_price > 0) ? (product.cost_price * added) : ''
       setExpenseConfirmModal({
         open: true,
         product,
         added,
-        cost: product.cost_price * added,
+        cost: suggestedCost,
         newStock
       })
       return
     }
 
-    // Si no hay costo o se está reduciendo stock → guardar directo
+    // Si se está reduciendo stock o no hubo cambios → guardar directo
     await commitStockUpdate(product, newStock, oldStock)
   }
 
@@ -79,8 +78,11 @@ export default function StockModule() {
   }
 
   async function handleConfirmExpense(registerExpense) {
-    const { product, added, cost, newStock } = expenseConfirmModal
+    let { product, added, cost, newStock } = expenseConfirmModal
     const oldStock = product.stock ?? 0
+    if (registerExpense && (isNaN(cost) || cost <= 0)) {
+      return toast('Por favor, ingresá un costo válido para registrar el gasto', 'warning')
+    }
     setSavingExpense(true)
     try {
       // 1. Actualizar el stock
@@ -289,15 +291,28 @@ export default function StockModule() {
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 Costo unitario registrado: <strong>{formatMoney(expenseConfirmModal.product?.cost_price)}</strong><br />
-                <span style={{ fontSize: '1.1rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                  Costo total de esta compra: {formatMoney(expenseConfirmModal.cost)}
-                </span>
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Costo total de esta compra:
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>$</span>
+                    <input 
+                      type="number" 
+                      value={expenseConfirmModal.cost} 
+                      onChange={e => setExpenseConfirmModal(prev => ({ ...prev, cost: e.target.value ? parseFloat(e.target.value) : '' }))}
+                      className="input-sm"
+                      style={{ fontSize: '1.1rem', fontWeight: 700, width: '120px' }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            ¿Querés registrar automáticamente <strong>{formatMoney(expenseConfirmModal.cost)}</strong> como gasto de <em>Compra de Mercadería</em> en la Caja?
+            ¿Querés registrar automáticamente este importe como gasto de <em>Compra de Mercadería</em> en la Caja?
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -306,7 +321,7 @@ export default function StockModule() {
               disabled={savingExpense}
               className="btn btn-primary"
             >
-              {savingExpense ? 'Guardando...' : `✓ Sí, registrar gasto de ${formatMoney(expenseConfirmModal.cost)}`}
+              {savingExpense ? 'Guardando...' : `✓ Sí, registrar gasto${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
             </button>
             <button
               onClick={() => handleConfirmExpense(false)}

@@ -689,6 +689,7 @@ export async function dbEnsureExpenseCategory(tenantId, name) {
     .eq('tenant_id', tenantId)
     .eq('name', name)
     .eq('is_active', true)
+    .limit(1)
     .maybeSingle()
   if (existing) return existing
   const { data, error } = await sb.from('expense_categories')
