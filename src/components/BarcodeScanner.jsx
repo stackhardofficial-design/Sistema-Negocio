@@ -18,10 +18,13 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
 
   // ===== LECTOR FÍSICO (USB HID) =====
   useEffect(() => {
-    if (!active || cameraOpen) return
+    if (!active) return
     let buf = ''
     let lastTime = 0
     const handleKey = (e) => {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
       const now = Date.now()
       if (now - lastTime > 80 && buf.length > 0) buf = ''
       lastTime = now
@@ -33,7 +36,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [active, cameraOpen])
+  }, [active])
 
   async function handleScanned(barcode) {
     setScanning(true)

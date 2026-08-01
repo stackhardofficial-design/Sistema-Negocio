@@ -39,12 +39,6 @@ export default function VentasModule() {
 
   const barcodeRef = useRef(null)
 
-  useEffect(() => {
-    // Pequeño delay para que el teclado no aparezca automáticamente en mobile
-    const t = setTimeout(() => barcodeRef.current?.focus(), 300)
-    return () => clearTimeout(t)
-  }, [])
-
 
 
   const handleScan = useCallback(async (code) => {
@@ -77,7 +71,6 @@ export default function VentasModule() {
       
       setQuantity(1)
       setBarcodeInput('')
-      setTimeout(() => barcodeRef.current?.focus(), 50)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
       setBarcodeInput('')
