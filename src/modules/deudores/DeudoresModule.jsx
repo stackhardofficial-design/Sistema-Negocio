@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
-  dbGetDebtors, dbCreateDebtor, dbAddDebtorPayment,
+  sb, dbGetDebtors, dbCreateDebtor, dbAddDebtorPayment,
   dbAddDebtorCharge, dbSettleDebtor
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
@@ -27,15 +27,23 @@ export default function DeudoresModule() {
   const [chargeForm, setChargeForm] = useState({ amount: '', note: '' })
   const [saving, setSaving] = useState(false)
 
-  async function load() {
+  async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
-    setLoading(true)
+    if (showLoading) setLoading(true)
     const data = await dbGetDebtors(tenantId, { includeSettled: showSettled })
     setDebtors(data)
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
-  useEffect(() => { load() }, [tenantId, showSettled])
+  useEffect(() => {
+    load()
+    if (!tenantId) return
+    const channel = sb.channel('deudores_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debtors', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_payments' }, () => load(false))
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId, showSettled])
 
   async function handleCreate() {
     if (!newForm.name.trim()) return toast('El nombre es obligatorio', 'warning')

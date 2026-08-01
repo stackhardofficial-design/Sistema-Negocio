@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
-  dbGetExpenseCategories, dbCreateExpenseCategory, dbUpdateExpenseCategory, dbDeleteExpenseCategory,
+  sb, dbGetExpenseCategories, dbCreateExpenseCategory, dbUpdateExpenseCategory, dbDeleteExpenseCategory,
   dbGetExpenses, dbCreateExpense, dbDeleteExpense,
   dbGetSaleSummary
 } from '../../lib/supabase'
@@ -45,9 +45,9 @@ export default function FinanzasModule() {
 
   const [saving, setSaving] = useState(false)
 
-  async function load() {
+  async function load(showLoading = true) {
     if (!tenantId) return
-    setLoading(true)
+    if (showLoading) setLoading(true)
     try {
       const cats = await dbGetExpenseCategories(tenantId)
       setCategories(cats)
@@ -60,13 +60,21 @@ export default function FinanzasModule() {
       const sales = await dbGetSaleSummary(tenantId, dateFrom + 'T00:00:00Z', dateTo + 'T23:59:59Z')
       setSalesSummary(sales)
     } catch (err) {
-      toast('Error al cargar finanzas: ' + err.message, 'danger')
+      toast(`Error cargando finanzas: ${err.message}`, 'danger')
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [tenantId, dateFrom, dateTo])
+  useEffect(() => {
+    load()
+    if (!tenantId) return
+    const channel = sb.channel('finanzas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId, dateFrom, dateTo])
 
   // ===== GASTOS =====
   async function handleSaveExpense() {

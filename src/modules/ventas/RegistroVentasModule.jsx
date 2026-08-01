@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
-  dbGetSales, dbCancelSale, dbLogActivity,
-  dbUpdateSaleItem, dbDeleteSaleItem, subscribeToSales, unsubscribe
+  sb, dbGetSales, dbCancelSale, dbLogActivity,
+  dbUpdateSaleItem, dbDeleteSaleItem
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -50,16 +50,19 @@ export default function RegistroVentasModule() {
 
   useEffect(() => {
     loadSales()
-    const chan = subscribeToSales(tenantId, () => loadSales())
-    return () => unsubscribe(chan)
+    if (!tenantId) return
+    const channel = sb.channel('registro_ventas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => loadSales(false))
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
   }, [tenantId])
 
-  async function loadSales() {
+  async function loadSales(showLoading = true) {
     if (!tenantId) { setLoadingSales(false); return }
-    setLoadingSales(true)
+    if (showLoading) setLoadingSales(true)
     const data = await dbGetSales(tenantId, { limit: 500 })
     setSales(data)
-    setLoadingSales(false)
+    if (showLoading) setLoadingSales(false)
 
     const completed = data.filter(s => s.status === 'completed')
     setTotals({

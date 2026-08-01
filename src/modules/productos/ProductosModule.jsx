@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
-  dbGetProducts, dbGetCategories, dbCreateProduct,
+  sb, dbGetProducts, dbGetCategories, dbCreateProduct,
   dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity,
   dbCreateCategory, dbDeleteCategory
 } from '../../lib/supabase'
@@ -65,19 +65,27 @@ export default function ProductosModule() {
     }
   }
 
-  async function load() {
+  async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
-    setLoading(true)
+    if (showLoading) setLoading(true)
     const [p, c] = await Promise.all([
       dbGetProducts(tenantId, { includeInactive: true }),
       dbGetCategories(tenantId)
     ])
     setProducts(p)
     setCategories(c)
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
-  useEffect(() => { load() }, [tenantId])
+  useEffect(() => {
+    load()
+    if (!tenantId) return
+    const channel = sb.channel('productos_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_categories', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId])
 
   function openCreate() {
     setForm(EMPTY_PRODUCT)

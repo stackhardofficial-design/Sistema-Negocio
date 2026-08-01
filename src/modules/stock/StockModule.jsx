@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetProducts, dbUpdateProductStock, dbLogActivity, dbCreateExpense, dbEnsureExpenseCategory } from '../../lib/supabase'
+import { sb, dbGetProducts, dbUpdateProductStock, dbLogActivity, dbCreateExpense, dbEnsureExpenseCategory } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Layers, AlertTriangle, Search, Edit2, Check, X, RefreshCw, ShoppingCart } from 'lucide-react'
 
@@ -19,15 +19,26 @@ export default function StockModule() {
   const [expenseConfirmModal, setExpenseConfirmModal] = useState({ open: false, product: null, added: 0, cost: 0, newStock: 0 })
   const [savingExpense, setSavingExpense] = useState(false)
 
-  async function load() {
+  async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
-    setLoading(true)
+    if (showLoading) setLoading(true)
     const data = await dbGetProducts(tenantId, { includeInactive: false })
     setProducts(data)
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
-  useEffect(() => { load() }, [tenantId])
+  useEffect(() => {
+    load()
+
+    if (!tenantId) return
+    const channel = sb.channel('stock_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `tenant_id=eq.${tenantId}` }, () => {
+        load(false) // Reload quietly
+      })
+      .subscribe()
+
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId])
 
   async function saveStock(product) {
     const newStock = parseInt(editValue)

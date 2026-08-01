@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
-  dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
+  sb, dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
   dbGetIngredients, dbCreateIngredient, dbUpdateIngredient, dbDeleteIngredient,
   dbSetBuffetIngredients, dbGetBuffetOrders,
-  dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, subscribeToBuffetOrders, unsubscribe
+  dbCreateBuffetOrder, dbUpdateBuffetOrderStatus
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X } from 'lucide-react'
@@ -39,9 +39,9 @@ export default function BuffetModule() {
   const [ingredientModal, setIngredientModal] = useState({ open: false, edit: null })
   const [ingForm, setIngForm] = useState({ name: '', unit: 'unidad', cost_price: '', stock: '', min_stock: '' })
 
-  async function load() {
+  async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
-    setLoading(true)
+    if (showLoading) setLoading(true)
     const [bp, ings, ord] = await Promise.all([
       dbGetBuffetProducts(tenantId),
       dbGetIngredients(tenantId),
@@ -50,13 +50,16 @@ export default function BuffetModule() {
     setBuffetProducts(bp)
     setIngredients(ings)
     setOrders(ord)
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   useEffect(() => {
     load()
-    const chan = subscribeToBuffetOrders(tenantId, load)
-    return () => unsubscribe(chan)
+    if (!tenantId) return
+    const channel = sb.channel('buffet_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'buffet_orders', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
   }, [tenantId])
 
   function openCreate() {

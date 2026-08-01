@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetSales, dbGetProducts } from '../../lib/supabase'
+import { sb, dbGetSales, dbGetProducts } from '../../lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -24,9 +24,9 @@ export default function DashboardModule() {
   const [products, setProducts] = useState([])
   const [refreshing, setRefreshing] = useState(false)
 
-  async function load() {
+  async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
-    setRefreshing(true)
+    if (showLoading) setRefreshing(true)
     const now = new Date()
     const from = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString()
     const [s, p] = await Promise.all([
@@ -35,11 +35,23 @@ export default function DashboardModule() {
     ])
     setSales(s)
     setProducts(p)
-    setLoading(false)
-    setRefreshing(false)
+    if (showLoading) {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }
 
-  useEffect(() => { load() }, [tenantId])
+  useEffect(() => {
+    load()
+    if (!tenantId) return
+
+    const channel = sb.channel('dashboard_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .subscribe()
+
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId])
 
   // ===== Computar KPIs =====
   const today = new Date()
