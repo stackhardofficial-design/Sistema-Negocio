@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant } from '../../lib/supabase'
+import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Settings, Plus, Edit2, Trash2, Tag, Building2 } from 'lucide-react'
 
@@ -24,6 +24,15 @@ export default function ConfiguracionModule() {
   }
 
   useEffect(() => { load() }, [tenantId, tenant])
+
+  useEffect(() => {
+    if (!tenantId) return
+    const channel = sb.channel('config_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_categories', filter: `tenant_id=eq.${tenantId}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tenants', filter: `id=eq.${tenantId}` }, () => load())
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId])
 
   async function handleSaveCat() {
     if (!catForm.name.trim()) return toast('El nombre es obligatorio', 'warning')

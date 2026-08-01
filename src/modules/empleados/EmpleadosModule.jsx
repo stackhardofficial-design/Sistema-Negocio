@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetUsers, dbUpdateUser, dbDeleteUser, dbLogActivity, dbCreateUserForTenant, dbGetAllUsersWithTenants } from '../../lib/supabase'
+import { sb, dbGetUsers, dbUpdateUser, dbDeleteUser, dbLogActivity, dbCreateUserForTenant, dbGetAllUsersWithTenants } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Users, Plus, Edit2, UserX, UserCheck, Search, Shield, Eye, EyeOff } from 'lucide-react'
 
@@ -44,6 +44,14 @@ export default function EmpleadosModule() {
   }
 
   useEffect(() => { load() }, [tenantId, userInfo])
+
+  useEffect(() => {
+    if (!tenantId && !isSuperAdmin()) return
+    const channel = sb.channel('empleados_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => load())
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId])
 
   function openEdit(u) {
     setEditForm({ name: u.name || '', role: u.role || 'vendedor', is_active: u.is_active ?? true })

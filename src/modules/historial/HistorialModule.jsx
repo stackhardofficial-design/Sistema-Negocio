@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetActivityLog } from '../../lib/supabase'
+import { sb, dbGetActivityLog } from '../../lib/supabase'
 import { ClipboardList, Search, Filter, RefreshCw, X } from 'lucide-react'
 
 function formatDateTime(d) {
@@ -57,6 +57,14 @@ export default function HistorialModule() {
   }
 
   useEffect(() => { load() }, [tenantId, filterAction, filterEntity, filterDate])
+
+  useEffect(() => {
+    if (!tenantId) return
+    const channel = sb.channel('historial_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs', filter: `tenant_id=eq.${tenantId}` }, () => load())
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [tenantId])
 
   const filtered = logs.filter(l => {
     if (!search) return true

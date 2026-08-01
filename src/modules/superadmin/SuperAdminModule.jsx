@@ -26,6 +26,13 @@ export default function SuperAdminModule() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    const channel = sb.channel('superadmin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tenants' }, () => load())
+      .subscribe()
+    return () => { sb.removeChannel(channel) }
+  }, [])
+
   // Auto-complete email when place name changes
   function handleNameChange(name) {
     const slug = name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
