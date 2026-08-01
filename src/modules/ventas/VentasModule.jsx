@@ -1,11 +1,10 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   dbGetProductByBarcode, dbCreateSale, dbLogActivity
 } from '../../lib/supabase'
-import BarcodeScanner from '../../components/BarcodeScanner'
 import {
-  Barcode, CheckCircle2, Package, Zap, Hash, Minus, Plus, Camera
+  Barcode, CheckCircle2, Package, Zap, Hash, Minus, Plus
 } from 'lucide-react'
 
 function formatMoney(n) {
@@ -321,9 +320,7 @@ export default function VentasModule() {
                   </>
                 )}
               </button>
-              <div style={{ flexShrink: 0 }}>
-                <BarcodeScanner onScan={handleScan} active={!loading} showCamera={true} />
-              </div>
+
             </div>
           </form>
         </div>
