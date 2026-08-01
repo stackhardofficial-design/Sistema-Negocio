@@ -544,84 +544,117 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
     <div
       onClick={onDetail}
       style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '12px 16px',
+        display: 'flex', flexDirection: 'column', gap: '12px',
+        padding: '16px',
         background: 'var(--bg-card)',
         border: `1px solid ${cancelled ? 'rgba(239,68,68,0.2)' : 'var(--border)'}`,
-        borderRadius: 'var(--radius-md)',
-        cursor: 'pointer', transition: 'all 0.15s',
-        opacity: cancelled ? 0.65 : 1
+        borderRadius: 'var(--radius-lg)',
+        cursor: 'pointer', transition: 'all 0.2s ease',
+        opacity: cancelled ? 0.75 : 1,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.background = 'var(--bg-tertiary)'
-        e.currentTarget.style.borderColor = cancelled ? 'rgba(239,68,68,0.4)' : 'var(--border-light)'
+        e.currentTarget.style.transform = 'translateY(-2px)'
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+        e.currentTarget.style.borderColor = cancelled ? 'rgba(239,68,68,0.4)' : 'var(--accent-soft)'
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.background = 'var(--bg-card)'
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'
         e.currentTarget.style.borderColor = cancelled ? 'rgba(239,68,68,0.2)' : 'var(--border)'
       }}
     >
-      {/* Estado dot */}
-      <div style={{
-        width: '8px', height: '8px', borderRadius: '50%',
-        background: cancelled ? 'var(--danger)' : 'var(--success)',
-        flexShrink: 0
-      }} />
-
-      {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.82rem' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-primary)', fontWeight: 500 }}>
-            <User size={13} color="var(--text-muted)" /> {sale.users?.name || 'Desconocido'}
-          </span>
-          <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Package size={13} />
-            {(sale.sale_items || []).length} producto{(sale.sale_items || []).length !== 1 ? 's' : ''} · {itemsCount} unid.
-          </span>
-        </div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-          {formatDateTime(sale.created_at)}
-          {cancelled && <span style={{ marginLeft: '8px', color: 'var(--danger)', fontWeight: 600 }}>● Anulada</span>}
-        </div>
-      </div>
-
-      {/* Monto */}
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{
-          fontWeight: 700, fontSize: '0.95rem',
-          color: cancelled ? 'var(--text-muted)' : 'var(--text-primary)',
-          textDecoration: cancelled ? 'line-through' : 'none'
-        }}>
-          {formatMoney(sale.total_amount)}
-        </div>
-        {!cancelled && (
-          <div style={{ fontSize: '0.72rem', color: 'var(--success)' }}>
-            +{formatMoney(profit)}
+      {/* HEADER ROW: Seller, Date, Status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{
+            width: '38px', height: '38px', borderRadius: '50%',
+            background: cancelled ? 'var(--danger-soft)' : 'var(--accent-soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: cancelled ? 'var(--danger)' : 'var(--accent)',
+            fontWeight: 700, fontSize: '1rem', border: `1px solid ${cancelled ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`
+          }}>
+            {(sale.users?.name || 'U').charAt(0).toUpperCase()}
           </div>
-        )}
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+              Vendedor: {sale.users?.name || 'Desconocido'}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={12} /> {formatDateTime(sale.created_at)}
+              </span>
+              {cancelled && <span style={{ color: 'var(--danger)', fontWeight: 600 }}>• ANULADA</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Totals & Actions */}
+        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+          <div style={{
+            fontWeight: 800, fontSize: '1.25rem',
+            color: cancelled ? 'var(--text-muted)' : 'var(--text-primary)',
+            textDecoration: cancelled ? 'line-through' : 'none',
+            lineHeight: 1
+          }}>
+            {formatMoney(sale.total_amount)}
+          </div>
+          {!cancelled && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600, backgroundColor: 'rgba(34,197,94,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+              Ganancia: {formatMoney(profit)}
+            </div>
+          )}
+          {isAdmin && !cancelled && (
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }} onClick={e => e.stopPropagation()}>
+              <button onClick={onEdit} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '0.7rem' }}>
+                <Edit2 size={12} style={{ marginRight: '4px' }} /> Editar
+              </button>
+              <button onClick={onCancel} className="btn btn-danger btn-sm" style={{ padding: '4px 8px', fontSize: '0.7rem' }}>
+                <Trash2 size={12} style={{ marginRight: '4px' }} /> Anular
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Acciones rápidas (admin) */}
-      {isAdmin && !cancelled && (
-        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-          <button
-            onClick={onEdit}
-            className="btn btn-secondary btn-sm"
-            title="Modificar venta"
-            style={{ padding: '5px 8px' }}
-          >
-            <Edit2 size={13} />
-          </button>
-          <button
-            onClick={onCancel}
-            className="btn btn-danger btn-sm"
-            title="Anular venta"
-            style={{ padding: '5px 8px' }}
-          >
-            <Trash2 size={13} />
-          </button>
+      {/* ITEMS LIST */}
+      <div style={{ 
+        background: 'var(--bg-tertiary)', 
+        borderRadius: 'var(--radius-md)', 
+        padding: '12px 16px',
+        border: '1px solid var(--border-light)',
+        marginTop: '4px'
+      }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Package size={14} /> Detalles de Venta ({itemsCount} unidades)
         </div>
-      )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {(sale.sale_items || []).map((item, idx) => (
+            <div key={idx} style={{ 
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: '0.85rem', paddingBottom: idx !== sale.sale_items.length - 1 ? '8px' : '0',
+              borderBottom: idx !== sale.sale_items.length - 1 ? '1px dashed var(--border)' : 'none'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {item.quantity}x {item.products?.name || 'Producto Desconocido'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
+                  {item.products?.barcode ? `Cód: ${item.products.barcode}` : 'Sin código de barras'}
+                </span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {formatMoney(item.subtotal)}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {formatMoney(item.unit_price)} c/u
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
