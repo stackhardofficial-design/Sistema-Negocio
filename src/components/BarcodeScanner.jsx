@@ -57,6 +57,9 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         const { Html5Qrcode } = await import('html5-qrcode')
         if (stopped) return
 
+        let lastCode = ''
+        let lastScanTime = 0
+
         html5QrCode = new Html5Qrcode(containerId)
         scannerRef.current = html5QrCode
 
@@ -72,9 +75,16 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
           },
           async (code) => {
             if (stopped) return
-            stopped = true
-            await stop()
-            setCameraOpen(false)
+            const now = Date.now()
+            if (code === lastCode && now - lastScanTime < 1500) return // debounce same code
+            lastCode = code
+            lastScanTime = now
+            
+            if (!inline) {
+              stopped = true
+              await stop()
+              setCameraOpen(false)
+            }
             await handleScanned(code)
           },
           () => {}

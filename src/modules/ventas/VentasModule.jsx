@@ -35,12 +35,8 @@ export default function VentasModule() {
   const [barcodeInput, setBarcodeInput] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [confirmation, setConfirmation] = useState(null)
-  const [progress, setProgress] = useState(100)
   const [flashSuccess, setFlashSuccess] = useState(false)
 
-  const timerRef = useRef(null)
-  const progressRef = useRef(null)
   const barcodeRef = useRef(null)
 
   useEffect(() => {
@@ -49,31 +45,7 @@ export default function VentasModule() {
     return () => clearTimeout(t)
   }, [])
 
-  function clearTimer() {
-    clearTimeout(timerRef.current)
-    clearInterval(progressRef.current)
-  }
 
-  function showConfirmation(data) {
-    clearTimer()
-    setConfirmation(data)
-    setProgress(100)
-    let elapsed = 0
-    progressRef.current = setInterval(() => {
-      elapsed += 50
-      setProgress(Math.max(0, 100 - (elapsed / 5000) * 100))
-    }, 50)
-    timerRef.current = setTimeout(() => {
-      clearInterval(progressRef.current)
-      setConfirmation(null)
-      setProgress(100)
-      setBarcodeInput('')
-      setQuantity(1)
-      setTimeout(() => barcodeRef.current?.focus(), 100)
-    }, 5000)
-  }
-
-  useEffect(() => () => clearTimer(), [])
 
   const handleScan = useCallback(async (code) => {
     if (!code?.trim() || !tenantId || loading) return
@@ -100,12 +72,12 @@ export default function VentasModule() {
       playBeep()
       setFlashSuccess(true)
       setTimeout(() => setFlashSuccess(false), 300)
-      showConfirmation({
-        product, quantity: qty, total,
-        seller: userInfo?.name || userInfo?.email?.split('@')[0] || 'Vendedor'
-      })
+      
+      toast(`✅ ${qty}x ${product.name} registrados: ${formatMoney(total)}`, 'success')
+      
       setQuantity(1)
       setBarcodeInput('')
+      setTimeout(() => barcodeRef.current?.focus(), 50)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
       setBarcodeInput('')
@@ -350,103 +322,6 @@ export default function VentasModule() {
             <BarcodeScanner onScan={handleScan} active={!loading} showCamera={false} inline={true} autoStart={true} />
           </div>
         </div>
-
-        {/* ===== CONFIRMACIÓN FLASH ===== */}
-        {confirmation && (
-          <div
-            className="fade-in"
-            style={{
-              borderRadius: '16px',
-              overflow: 'hidden',
-              border: '2px solid var(--success)',
-              boxShadow: '0 8px 32px rgba(16,185,129,0.2)',
-            }}
-          >
-            {/* Barra de progreso */}
-            <div style={{ height: '4px', background: 'var(--bg-tertiary)' }}>
-              <div style={{
-                height: '100%', width: `${progress}%`,
-                background: 'var(--success)', transition: 'width 0.05s linear'
-              }} />
-            </div>
-
-            <div style={{
-              background: 'var(--bg-secondary)',
-              padding: '16px 18px',
-              display: 'flex', flexDirection: 'column', gap: '12px'
-            }}>
-              {/* Cabecera ok */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '38px', height: '38px', borderRadius: '10px',
-                  background: 'rgba(16,185,129,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                }}>
-                  <CheckCircle2 size={20} color="var(--success)" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, color: 'var(--success)', fontSize: '0.95rem' }}>
-                    Â¡Venta registrada!
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {confirmation.seller}
-                  </div>
-                </div>
-                <div style={{
-                  fontSize: '1.6rem', fontWeight: 800,
-                  color: 'var(--text-primary)', letterSpacing: '-0.02em'
-                }}>
-                  {formatMoney(confirmation.total)}
-                </div>
-              </div>
-
-              {/* Producto */}
-              <div style={{
-                background: 'var(--bg)', borderRadius: '12px', padding: '12px 14px',
-                display: 'flex', alignItems: 'center', gap: '12px'
-              }}>
-                <Package size={18} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontWeight: 600, fontSize: '0.9rem',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    color: 'var(--text-primary)'
-                  }}>
-                    {confirmation.product.name}
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
-                    {confirmation.product.barcode && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <Hash size={10} /> {confirmation.product.barcode}
-                      </span>
-                    )}
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {formatMoney(confirmation.product.price)} c/u
-                    </span>
-                  </div>
-                </div>
-                {/* Cantidad badge */}
-                <div style={{
-                  background: 'var(--accent-soft)', border: '1px solid rgba(245,158,11,0.3)',
-                  borderRadius: '10px', padding: '6px 14px',
-                  textAlign: 'center', flexShrink: 0,
-                  minWidth: '48px'
-                }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>
-                    {confirmation.quantity}
-                  </div>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--accent)', marginTop: '1px' }}>unid.</div>
-                </div>
-              </div>
-
-              {/* Countdown */}
-              <div style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Se oculta en {Math.max(1, Math.ceil(progress / 20))}s · tocá para descartar
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
 
       <style>{`
