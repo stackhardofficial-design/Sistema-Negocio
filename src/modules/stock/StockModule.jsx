@@ -46,8 +46,8 @@ export default function StockModule() {
 
     const oldStock = product.stock ?? 0
     const added = newStock - oldStock
-    // Si se están sumando unidades mostrar modal de confirmación, tenga costo previo o no
-    if (added > 0) {
+    // Si se está modificando stock mostrar modal de confirmación, tenga costo previo o no
+    if (added !== 0) {
       const suggestedCost = (product.cost_price && product.cost_price > 0) ? (product.cost_price * added) : ''
       setExpenseConfirmModal({
         open: true,
@@ -59,7 +59,7 @@ export default function StockModule() {
       return
     }
 
-    // Si se está reduciendo stock o no hubo cambios → guardar directo
+    // Si no hubo cambios → guardar directo
     await commitStockUpdate(product, newStock, oldStock)
   }
 
@@ -80,8 +80,10 @@ export default function StockModule() {
   async function handleConfirmExpense(registerExpense) {
     let { product, added, cost, newStock } = expenseConfirmModal
     const oldStock = product.stock ?? 0
-    if (registerExpense && (isNaN(cost) || cost <= 0)) {
-      return toast('Por favor, ingresá un costo válido para registrar el gasto', 'warning')
+    if (registerExpense) {
+      if (isNaN(cost)) return toast('Por favor, ingresá un valor numérico válido', 'warning')
+      if (added > 0 && cost <= 0) return toast('El costo debe ser mayor a 0 para ingresos', 'warning')
+      if (added < 0 && cost >= 0) return toast('El ajuste debe ser negativo (ej: -500) para devoluciones', 'warning')
     }
     setSavingExpense(true)
     try {
@@ -275,25 +277,25 @@ export default function StockModule() {
       <Modal
         open={expenseConfirmModal.open}
         onClose={() => !savingExpense && setExpenseConfirmModal({ open: false, product: null, added: 0, cost: 0, newStock: 0 })}
-        title="Ingreso de Mercadería Detectado"
+        title={expenseConfirmModal.added > 0 ? "Ingreso de Mercadería Detectado" : "Reducción de Mercadería Detectada"}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{
             padding: '16px', borderRadius: '12px',
-            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+            background: expenseConfirmModal.added > 0 ? 'var(--accent-soft)' : 'var(--danger-soft)', border: `1px solid ${expenseConfirmModal.added > 0 ? 'var(--accent)' : 'var(--danger)'}`,
             display: 'flex', gap: '12px', alignItems: 'flex-start'
           }}>
-            <ShoppingCart size={22} color="var(--accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <ShoppingCart size={22} color={expenseConfirmModal.added > 0 ? "var(--accent)" : "var(--danger)"} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
               <div style={{ fontWeight: 600, marginBottom: '6px' }}>
-                Estás sumando {expenseConfirmModal.added} unidades de<br />
-                <span style={{ color: 'var(--accent)' }}>"{expenseConfirmModal.product?.name}"</span>
+                Estás {expenseConfirmModal.added > 0 ? 'sumando' : 'restando'} {Math.abs(expenseConfirmModal.added)} unidades de<br />
+                <span style={{ color: expenseConfirmModal.added > 0 ? 'var(--accent)' : 'var(--danger)' }}>"{expenseConfirmModal.product?.name}"</span>
               </div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 Costo unitario registrado: <strong>{formatMoney(expenseConfirmModal.product?.cost_price)}</strong><br />
                 <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Costo total de esta compra:
+                    {expenseConfirmModal.added > 0 ? 'Costo total de esta compra:' : 'Ajuste a favor en Caja (negativo):'}
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>$</span>
@@ -312,7 +314,7 @@ export default function StockModule() {
           </div>
 
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            ¿Querés registrar automáticamente este importe como gasto de <em>Compra de Mercadería</em> en la Caja?
+            ¿Querés registrar automáticamente este importe como {expenseConfirmModal.added > 0 ? 'gasto de' : 'ajuste de'} <em>Compra de Mercadería</em> en la Caja?
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -321,7 +323,7 @@ export default function StockModule() {
               disabled={savingExpense}
               className="btn btn-primary"
             >
-              {savingExpense ? 'Guardando...' : `✓ Sí, registrar gasto${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
+              {savingExpense ? 'Guardando...' : `✓ Sí, registrar ${expenseConfirmModal.added > 0 ? 'gasto' : 'ajuste'}${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
             </button>
             <button
               onClick={() => handleConfirmExpense(false)}

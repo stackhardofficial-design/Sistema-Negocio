@@ -3,7 +3,7 @@ import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetProducts, dbGetCategories, dbCreateProduct,
   dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity,
-  dbCreateCategory, dbDeleteCategory
+  dbCreateCategory, dbDeleteCategory, dbCreateExpense, dbEnsureExpenseCategory
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
@@ -16,7 +16,7 @@ function formatMoney(n) {
 const EMPTY_PRODUCT = {
   name: '', barcode: '', category_id: '',
   price: '', cost_price: '', stock: '', min_stock: '',
-  description: '', is_active: true
+  description: '', is_active: true, register_initial_expense: false
 }
 
 export default function ProductosModule() {
@@ -102,7 +102,8 @@ export default function ProductosModule() {
       stock: product.stock ?? '',
       min_stock: product.min_stock ?? '',
       description: product.description || '',
-      is_active: product.is_active ?? true
+      is_active: product.is_active ?? true,
+      register_initial_expense: false
     })
     setModal({ open: true, edit: product })
   }
@@ -153,6 +154,25 @@ export default function ProductosModule() {
         const created = await dbCreateProduct(payload)
         await dbLogActivity(tenantId, userInfo?.id, 'create', 'product', created.id, { name: form.name })
         toast('Producto creado', 'success')
+        
+        if (form.stock && parseInt(form.stock) > 0 && form.register_initial_expense && form.cost_price && parseFloat(form.cost_price) > 0) {
+          try {
+            const category = await dbEnsureExpenseCategory(tenantId, 'Compra Mercadería')
+            const cost = parseInt(form.stock) * parseFloat(form.cost_price)
+            await dbCreateExpense({
+              tenant_id: tenantId,
+              user_id: userInfo?.id,
+              category_id: category.id,
+              amount: cost,
+              description: `${form.stock} u. de "${form.name}" (stock inicial, costo unit.: ${formatMoney(form.cost_price)})`,
+              expense_date: new Date().toISOString().split('T')[0],
+              expense_type: 'variable'
+            })
+            toast(`Gasto inicial registrado en Caja: ${formatMoney(cost)} ✓`, 'success')
+          } catch(err) {
+            toast(`Gasto inicial falló: ${err.message}`, 'warning')
+          }
+        }
       }
 
       setModal({ open: false, edit: null })
@@ -480,6 +500,21 @@ export default function ProductosModule() {
               />
             </div>
           </div>
+
+          {!modal.edit && form.stock > 0 && form.cost_price > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--accent-soft)', padding: '12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+              <input
+                type="checkbox"
+                id="register_initial_expense"
+                checked={form.register_initial_expense}
+                onChange={e => setForm(p => ({ ...p, register_initial_expense: e.target.checked }))}
+                style={{ width: 'auto' }}
+              />
+              <label htmlFor="register_initial_expense" className="form-label" style={{ cursor: 'pointer', margin: 0, fontWeight: 500, color: 'var(--accent)' }}>
+                Registrar gasto inicial en Caja por {formatMoney(form.stock * form.cost_price)}
+              </label>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Descripción (opcional)</label>
