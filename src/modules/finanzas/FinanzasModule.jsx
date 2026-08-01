@@ -196,6 +196,21 @@ export default function FinanzasModule() {
     return true
   })
 
+  function parseDescription(desc) {
+    if (!desc) return { isProduct: false, text: '-' }
+    try {
+      const data = JSON.parse(desc)
+      if (data._type === 'stock_restock') {
+        return { isProduct: true, data }
+      }
+    } catch {}
+    // Compatibility for older formats
+    if (desc.includes(' u. de "') && desc.includes('costo unitario:')) {
+      return { isProduct: false, text: desc }
+    }
+    return { isProduct: false, text: desc }
+  }
+
   return (
     <div className="fade-in">
       <div className="module-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
@@ -336,44 +351,52 @@ export default function FinanzasModule() {
                       <tr style={{ background: 'var(--bg-tertiary)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Fecha</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Categoría</th>
-                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Descripción</th>
-                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Tipo</th>
-                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Registrado por</th>
-                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>Monto</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Detalle / Producto</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Cód. Barras</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>Cant.</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>P. Unit.</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>Total</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'center', width: '60px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredExpenses.length === 0 ? (
                         <tr>
-                          <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          <td colSpan="8" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
                             No se encontraron gastos.
                           </td>
                         </tr>
                       ) : (
-                        filteredExpenses.map(exp => (
-                          <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-soft)', fontSize: '0.9rem' }}>
-                            <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date)}</td>
-                            <td style={{ padding: '12px 16px', fontWeight: 500 }}>{exp.expense_categories?.name || 'Sin categoría'}</td>
-                            <td style={{ padding: '12px 16px' }}>{exp.description || '-'}</td>
-                            <td style={{ padding: '12px 16px' }}>
-                              <span style={{
-                                padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
-                                background: exp.expense_type === 'fixed' ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.15)',
-                                color: exp.expense_type === 'fixed' ? 'var(--info)' : 'var(--warning)'
-                              }}>
-                                {exp.expense_type === 'fixed' ? '🔒 Fijo' : '🔄 Variable'}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{exp.users?.name || exp.users?.email?.split('@')[0] || 'Sistema'}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(exp.amount)}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
-                                <Trash2 size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        filteredExpenses.map(exp => {
+                          const parsed = parseDescription(exp.description)
+                          return (
+                            <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-soft)', fontSize: '0.9rem' }}>
+                              <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date)}</td>
+                              <td style={{ padding: '12px 16px', fontWeight: 500 }}>{exp.expense_categories?.name || 'Sin categoría'}</td>
+                              {parsed.isProduct ? (
+                                <>
+                                  <td style={{ padding: '12px 16px' }}>{parsed.data.name}</td>
+                                  <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{parsed.data.barcode || '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{parsed.data.qty}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{formatMoney(parsed.data.unit_cost)}</td>
+                                </>
+                              ) : (
+                                <>
+                                  <td style={{ padding: '12px 16px' }}>{parsed.text}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>-</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>-</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--text-muted)' }}>-</td>
+                                </>
+                              )}
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(exp.amount)}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
+                                  <Trash2 size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })
                       )}
                     </tbody>
                   </table>

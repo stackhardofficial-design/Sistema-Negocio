@@ -163,7 +163,13 @@ export default function ProductosModule() {
               user_id: userInfo?.id,
               category_id: category.id,
               amount: cost,
-              description: `Agregado ${addedStock} u. de "${form.name}" (stock, costo unit.: ${formatMoney(form.cost_price)})`,
+              description: JSON.stringify({
+                _type: 'stock_restock',
+                qty: addedStock,
+                name: form.name,
+                barcode: form.barcode || '',
+                unit_cost: parseFloat(form.cost_price)
+              }),
               expense_date: new Date().toISOString().split('T')[0],
               expense_type: 'variable'
             })
@@ -186,7 +192,13 @@ export default function ProductosModule() {
               user_id: userInfo?.id,
               category_id: category.id,
               amount: cost,
-              description: `${form.stock} u. de "${form.name}" (stock inicial, costo unit.: ${formatMoney(form.cost_price)})`,
+              description: JSON.stringify({
+                _type: 'stock_restock',
+                qty: parseInt(form.stock),
+                name: form.name,
+                barcode: form.barcode || '',
+                unit_cost: parseFloat(form.cost_price)
+              }),
               expense_date: new Date().toISOString().split('T')[0],
               expense_type: 'variable'
             })

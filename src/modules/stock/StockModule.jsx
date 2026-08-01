@@ -98,7 +98,13 @@ export default function StockModule() {
           user_id: userInfo?.id,
           category_id: category.id,
           amount: cost,
-          description: `${added} u. de "${product.name}" (costo unitario: ${formatMoney(product.cost_price)})`,
+          description: JSON.stringify({
+            _type: 'stock_restock',
+            qty: added,
+            name: product.name,
+            barcode: product.barcode || '',
+            unit_cost: product.cost_price
+          }),
           expense_date: new Date().toISOString().split('T')[0],
           expense_type: 'variable'
         })
