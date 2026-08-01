@@ -4,9 +4,13 @@ import { Camera, X, Loader } from 'lucide-react'
 /**
  * BarcodeScanner - usa html5-qrcode (que funciona) con config de máxima velocidad
  */
-export default function BarcodeScanner({ onScan, active = true, showCamera = false }) {
+export default function BarcodeScanner({ onScan, active = true, showCamera = false, inline = false, autoStart = false }) {
   const [scanning, setScanning] = useState(false)
-  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraOpen, setCameraOpen] = useState(autoStart)
+
+  useEffect(() => {
+    if (autoStart) setCameraOpen(true)
+  }, [autoStart])
   const [error, setError] = useState('')
   const scannerRef = useRef(null)
   const uid = useId().replace(/:/g, '')
@@ -152,7 +156,9 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
 
       {/* Modal del escáner */}
       {cameraOpen && (
-        <div style={{
+        <div style={inline ? {
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%'
+        } : {
           position: 'fixed', inset: 0,
           background: 'rgba(0,0,0,0.97)',
           zIndex: 2000,
@@ -163,19 +169,23 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
           gap: '16px',
           padding: '20px'
         }}>
-          <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-            Apuntá al código de barras
-          </p>
+          {!inline && (
+            <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
+              Apuntá al código de barras
+            </p>
+          )}
 
           {/* Contenedor donde html5-qrcode renderiza el video */}
           <div
             id={containerId}
-            style={{ width: '100%', maxWidth: '500px', borderRadius: '12px', overflow: 'hidden' }}
+            style={{ width: '100%', maxWidth: '500px', borderRadius: '12px', overflow: 'hidden', background: inline ? 'var(--bg)' : 'transparent' }}
           />
 
-          <button onClick={closeCamera} className="btn btn-danger" style={{ marginTop: '8px' }}>
-            <X size={16} /> Cancelar
-          </button>
+          {!inline && (
+            <button onClick={closeCamera} className="btn btn-danger" style={{ marginTop: '8px' }}>
+              <X size={16} /> Cancelar
+            </button>
+          )}
         </div>
       )}
 

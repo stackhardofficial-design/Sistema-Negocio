@@ -3,6 +3,7 @@ import { useApp } from '../../lib/AppContext'
 import {
   dbGetProductByBarcode, dbCreateSale, dbLogActivity
 } from '../../lib/supabase'
+import BarcodeScanner from '../../components/BarcodeScanner'
 import {
   Barcode, CheckCircle2, Package, Zap, Hash, Minus, Plus
 } from 'lucide-react'
@@ -345,6 +346,9 @@ export default function VentasModule() {
 
             </div>
           </form>
+          <div style={{ marginTop: '16px' }}>
+            <BarcodeScanner onScan={handleScan} active={!loading} showCamera={false} inline={true} autoStart={true} />
+          </div>
         </div>
 
         {/* ===== CONFIRMACIÓN FLASH ===== */}
