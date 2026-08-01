@@ -35,6 +35,9 @@ export default function FinanzasModule() {
     return d.toISOString().split('T')[0]
   })
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [gastosSearch, setGastosSearch] = useState('')
+  const [gastosTypeFilter, setGastosTypeFilter] = useState('all')
+  const [gastosCategoryFilter, setGastosCategoryFilter] = useState('all')
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
@@ -180,6 +183,19 @@ export default function FinanzasModule() {
     planilla.push(row)
   }
 
+  const filteredExpenses = expenses.filter(exp => {
+    if (gastosTypeFilter !== 'all' && exp.expense_type !== gastosTypeFilter) return false
+    if (gastosCategoryFilter !== 'all' && exp.category_id !== gastosCategoryFilter) return false
+    if (gastosSearch.trim()) {
+      const q = gastosSearch.toLowerCase()
+      const desc = exp.description?.toLowerCase() || ''
+      const cat = exp.expense_categories?.name?.toLowerCase() || ''
+      const amount = String(exp.amount)
+      if (!desc.includes(q) && !cat.includes(q) && !amount.includes(q)) return false
+    }
+    return true
+  })
+
   return (
     <div className="fade-in">
       <div className="module-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
@@ -292,53 +308,76 @@ export default function FinanzasModule() {
 
             {/* TAB: GASTOS */}
             {activeTab === 'gastos' && (
-              <div className="fade-in">
-                {expenses.length === 0 ? (
-                  <div className="empty-state">
-                    <List size={40} />
-                    <h3>Sin gastos registrados</h3>
-                    <p style={{ fontSize: '0.85rem' }}>No cargaste ningún gasto en este periodo.</p>
+              <div className="fade-in card" style={{ padding: '0', overflow: 'hidden' }}>
+                <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1rem' }}>Historial de Gastos</h3>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <select className="input-sm" value={gastosTypeFilter} onChange={e => setGastosTypeFilter(e.target.value)} style={{ padding: '6px' }}>
+                        <option value="all">Todos los Tipos</option>
+                        <option value="fixed">Fijos</option>
+                        <option value="variable">Variables</option>
+                      </select>
+                      <select className="input-sm" value={gastosCategoryFilter} onChange={e => setGastosCategoryFilter(e.target.value)} style={{ padding: '6px' }}>
+                        <option value="all">Todas las Categorías</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input type="text" placeholder="Buscar..." value={gastosSearch} onChange={e => setGastosSearch(e.target.value)} className="input-sm" style={{ paddingLeft: '32px', width: '180px', padding: '6px 6px 6px 32px' }} />
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {expenses.map(exp => (
-                      <div key={exp.id} className="card" style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{
-                            width: '40px', height: '40px', borderRadius: '12px',
-                            background: 'var(--danger-soft)', color: 'var(--danger)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}>
-                            <TrendingDown size={20} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: '1rem' }}>{exp.expense_categories?.name || 'Sin categoría'}</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-                              <span>{formatDate(exp.expense_date)}</span>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-tertiary)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Fecha</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Categoría</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Descripción</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Tipo</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Registrado por</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>Monto</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'center', width: '60px' }}>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExpenses.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No se encontraron gastos.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredExpenses.map(exp => (
+                          <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-soft)', fontSize: '0.9rem' }}>
+                            <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date)}</td>
+                            <td style={{ padding: '12px 16px', fontWeight: 500 }}>{exp.expense_categories?.name || 'Sin categoría'}</td>
+                            <td style={{ padding: '12px 16px' }}>{exp.description || '-'}</td>
+                            <td style={{ padding: '12px 16px' }}>
                               <span style={{
-                                padding: '1px 7px', borderRadius: '5px', fontWeight: 600,
+                                padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600,
                                 background: exp.expense_type === 'fixed' ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.15)',
                                 color: exp.expense_type === 'fixed' ? 'var(--info)' : 'var(--warning)'
                               }}>
                                 {exp.expense_type === 'fixed' ? '🔒 Fijo' : '🔄 Variable'}
                               </span>
-                              {exp.description && <span>· {exp.description}</span>}
-                              {exp.users?.name && <span>· {exp.users.name}</span>}
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
-                            {formatMoney(exp.amount)}
-                          </div>
-                          <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{exp.users?.name || exp.users?.email?.split('@')[0] || 'Sistema'}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(exp.amount)}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                              <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
