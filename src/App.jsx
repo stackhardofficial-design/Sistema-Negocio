@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Menu } from 'lucide-react'
 import { AppProvider, useApp } from './lib/AppContext.jsx'
 import { dbGetSession, dbGetUserInfo, dbGetTenant } from './lib/supabase.js'
 import Login from './components/Login.jsx'
@@ -27,7 +28,8 @@ function AppShell() {
     user, setUser,
     userInfo, setUserInfo,
     tenantId, setTenantId,
-    tenant, setTenant
+    tenant, setTenant,
+    sidebarCollapsed, setSidebarCollapsed
   } = useApp()
   const [loading, setLoading] = useState(true)
 
@@ -82,6 +84,22 @@ function AppShell() {
     <div className="app-layout">
       {/* Desktop Sidebar */}
       <Sidebar />
+
+      {/* Floating Menu Button when Sidebar is fully closed */}
+      {sidebarCollapsed && (
+        <button
+          className="sidebar-desktop"
+          onClick={() => setSidebarCollapsed(false)}
+          style={{
+            position: 'absolute', top: '16px', left: '16px', zIndex: 900,
+            background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+            borderRadius: '8px', padding: '10px', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}
+        >
+          <Menu size={20} color="var(--text-primary)" />
+        </button>
+      )}
 
       {/* Main Content */}
       <main className="workspace">

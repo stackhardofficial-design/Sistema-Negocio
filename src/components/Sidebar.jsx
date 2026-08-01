@@ -46,7 +46,7 @@ export default function Sidebar() {
 
   return (
     <aside style={{
-      width: sidebarCollapsed ? '64px' : '240px',
+      width: sidebarCollapsed ? '0px' : '240px',
       minHeight: '100vh',
       background: 'var(--bg-secondary)',
       borderRight: '1px solid var(--border)',
@@ -61,7 +61,7 @@ export default function Sidebar() {
     >
       {/* Header */}
       <div style={{
-        padding: sidebarCollapsed ? '20px 14px' : '20px',
+        padding: '20px',
         borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
@@ -102,7 +102,7 @@ export default function Sidebar() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  padding: sidebarCollapsed ? '10px 14px' : '10px 14px',
+                  padding: '10px 14px',
                   borderRadius: '10px',
                   background: isActive ? 'var(--accent-soft)' : 'transparent',
                   color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
@@ -112,7 +112,7 @@ export default function Sidebar() {
                   fontWeight: isActive ? 600 : 400,
                   fontSize: '0.875rem',
                   width: '100%',
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  justifyContent: 'flex-start',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -157,7 +157,7 @@ export default function Sidebar() {
             background: 'transparent', color: 'var(--text-muted)',
             border: '1px solid transparent', cursor: 'pointer',
             fontSize: '0.875rem', width: '100%',
-            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+            justifyContent: 'flex-start',
             transition: 'all 0.15s ease'
           }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger-soft)'; e.currentTarget.style.color = 'var(--danger)' }}
@@ -177,7 +177,7 @@ export default function Sidebar() {
             transition: 'all 0.15s ease', width: '100%'
           }}
         >
-          {sidebarCollapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span style={{ fontSize: '0.75rem', marginLeft: '6px' }}>Colapsar</span></>}
+          <ChevronLeft size={16} /><span style={{ fontSize: '0.75rem', marginLeft: '6px' }}>Cerrar Panel</span>
         </button>
       </div>
     </aside>
