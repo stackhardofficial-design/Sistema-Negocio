@@ -150,6 +150,28 @@ export default function ProductosModule() {
         await dbUpdateProduct(modal.edit.id, payload)
         await dbLogActivity(tenantId, userInfo?.id, 'update', 'product', modal.edit.id, { name: form.name })
         toast('Producto actualizado', 'success')
+
+        const oldStock = modal.edit.stock !== null && modal.edit.stock !== undefined ? modal.edit.stock : 0;
+        const newStock = form.stock !== '' ? parseInt(form.stock) : 0;
+        if (newStock > oldStock && form.register_initial_expense && form.cost_price && parseFloat(form.cost_price) > 0) {
+          try {
+            const category = await dbEnsureExpenseCategory(tenantId, 'Compra Mercadería')
+            const addedStock = newStock - oldStock
+            const cost = addedStock * parseFloat(form.cost_price)
+            await dbCreateExpense({
+              tenant_id: tenantId,
+              user_id: userInfo?.id,
+              category_id: category.id,
+              amount: cost,
+              description: `Agregado ${addedStock} u. de "${form.name}" (stock, costo unit.: ${formatMoney(form.cost_price)})`,
+              expense_date: new Date().toISOString().split('T')[0],
+              expense_type: 'variable'
+            })
+            toast(`Gasto por reposición de stock registrado: ${formatMoney(cost)} ✓`, 'success')
+          } catch(err) {
+            toast(`Error al registrar gasto: ${err.message}`, 'warning')
+          }
+        }
       } else {
         const created = await dbCreateProduct(payload)
         await dbLogActivity(tenantId, userInfo?.id, 'create', 'product', created.id, { name: form.name })
@@ -501,20 +523,31 @@ export default function ProductosModule() {
             </div>
           </div>
 
-          {!modal.edit && form.stock > 0 && form.cost_price > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--accent-soft)', padding: '12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
-              <input
-                type="checkbox"
-                id="register_initial_expense"
-                checked={form.register_initial_expense}
-                onChange={e => setForm(p => ({ ...p, register_initial_expense: e.target.checked }))}
-                style={{ width: 'auto' }}
-              />
-              <label htmlFor="register_initial_expense" className="form-label" style={{ cursor: 'pointer', margin: 0, fontWeight: 500, color: 'var(--accent)' }}>
-                Registrar gasto inicial en Caja por {formatMoney(form.stock * form.cost_price)}
-              </label>
-            </div>
-          )}
+          {(() => {
+            const isEditing = !!modal.edit;
+            const oldStock = isEditing && modal.edit.stock !== null && modal.edit.stock !== undefined ? modal.edit.stock : 0;
+            const newStock = form.stock !== '' ? parseInt(form.stock) : 0;
+            const addedStock = isEditing ? (newStock > oldStock ? newStock - oldStock : 0) : newStock;
+            
+            if (addedStock > 0 && form.cost_price > 0) {
+              const cost = addedStock * parseFloat(form.cost_price);
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--accent-soft)', padding: '12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+                  <input
+                    type="checkbox"
+                    id="register_initial_expense"
+                    checked={form.register_initial_expense}
+                    onChange={e => setForm(p => ({ ...p, register_initial_expense: e.target.checked }))}
+                    style={{ width: 'auto' }}
+                  />
+                  <label htmlFor="register_initial_expense" className="form-label" style={{ cursor: 'pointer', margin: 0, fontWeight: 500, color: 'var(--accent)' }}>
+                    Registrar gasto en Caja por {formatMoney(cost)}
+                  </label>
+                </div>
+              )
+            }
+            return null;
+          })()}
 
           <div className="form-group">
             <label className="form-label">Descripción (opcional)</label>
