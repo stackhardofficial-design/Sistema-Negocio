@@ -25,16 +25,13 @@ const MENU_ITEMS = [
 
 export default function Sidebar() {
   const { sidebarCollapsed, setSidebarCollapsed,
-    userInfo, tenant, hasRole } = useApp()
+    userInfo, tenant, hasRole, hasModuleAccess } = useApp()
 
   const visibleItems = MENU_ITEMS.filter(item => {
-    // Si el item requiere roles específicos, chequeamos si el usuario tiene alguno
-    if (item.roles.length > 0) return item.roles.some(r => hasRole(r))
-    
-    // Si el item NO tiene roles especificados (roles: []), 
-    // lo mostramos para admin y vendedor, pero NO para super_admin,
-    // ya que el super_admin no tiene tenantId y vería los datos mezclados.
-    return !hasRole('super_admin')
+    // Si es super_admin solo ve Super Admin
+    if (hasRole('super_admin')) return item.id === 'superadmin'
+    // El resto usa la nueva lógica consolidada en AppContext
+    return hasModuleAccess(item)
   })
 
   async function handleLogout() {

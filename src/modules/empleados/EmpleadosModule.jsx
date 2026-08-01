@@ -9,7 +9,21 @@ const ROLES = [
   { value: 'admin', label: 'Administrador', desc: 'Acceso completo excepto Super Admin' },
 ]
 
-const EMPTY_NEW_USER = { name: '', email: '', password: '', role: 'vendedor' }
+const AVAILABLE_MODULES = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'ventas', label: 'Ventas' },
+  { id: 'registro_ventas', label: 'Registro de Ventas' },
+  { id: 'finanzas', label: 'Finanzas (Caja)' },
+  { id: 'productos', label: 'Productos' },
+  { id: 'stock', label: 'Stock' },
+  { id: 'buffet', label: 'Buffet' },
+  { id: 'deudores', label: 'Deudores' },
+  { id: 'empleados', label: 'Empleados' },
+  { id: 'historial', label: 'Historial' },
+  { id: 'configuracion', label: 'Configuración' }
+]
+
+const EMPTY_NEW_USER = { name: '', email: '', password: '', role: 'vendedor', access_modules: ['dashboard', 'ventas', 'registro_ventas', 'productos', 'stock', 'buffet', 'deudores'] }
 
 export default function EmpleadosModule() {
   const { tenantId, userInfo, toast, isAdmin, isSuperAdmin } = useApp()
@@ -22,7 +36,7 @@ export default function EmpleadosModule() {
 
   // Modal editar
   const [editModal, setEditModal] = useState({ open: false, user: null })
-  const [editForm, setEditForm] = useState({ name: '', role: 'vendedor', is_active: true })
+  const [editForm, setEditForm] = useState({ name: '', role: 'vendedor', is_active: true, access_modules: [] })
 
   // Modal crear nuevo
   const [newModal, setNewModal] = useState(false)
@@ -54,8 +68,21 @@ export default function EmpleadosModule() {
   }, [tenantId])
 
   function openEdit(u) {
-    setEditForm({ name: u.name || '', role: u.role || 'vendedor', is_active: u.is_active ?? true })
+    let mods = u.access_modules
+    if (!mods) {
+      if (u.role === 'admin' || u.role === 'super_admin') mods = AVAILABLE_MODULES.map(m => m.id)
+      else mods = ['dashboard', 'ventas', 'registro_ventas', 'productos', 'stock', 'buffet', 'deudores']
+    }
+    setEditForm({ name: u.name || '', role: u.role || 'vendedor', is_active: u.is_active ?? true, access_modules: mods })
     setEditModal({ open: true, user: u })
+  }
+
+  function toggleModule(formSetter, moduleId) {
+    formSetter(f => {
+      const has = f.access_modules.includes(moduleId)
+      const next = has ? f.access_modules.filter(id => id !== moduleId) : [...f.access_modules, moduleId]
+      return { ...f, access_modules: next }
+    })
   }
 
   function toggleExpanded(id) {
@@ -90,7 +117,8 @@ export default function EmpleadosModule() {
         newForm.email.trim().toLowerCase(),
         newForm.password,
         newForm.name.trim(),
-        newForm.role
+        newForm.role,
+        newForm.access_modules
       )
       await dbLogActivity(tenantId, userInfo?.id, 'create', 'user', userRow.id, {
         name: newForm.name, email: newForm.email, role: newForm.role
@@ -306,6 +334,21 @@ export default function EmpleadosModule() {
             {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
           </select>
         </div>
+        <div className="form-group">
+          <label className="form-label">Accesos a Módulos (Apartados)</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
+            {AVAILABLE_MODULES.map(m => (
+              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={editForm.access_modules.includes(m.id)}
+                  onChange={() => toggleModule(setEditForm, m.id)}
+                />
+                {m.label}
+              </label>
+            ))}
+          </div>
+        </div>
       </Modal>
 
       {/* ===== MODAL: NUEVO EMPLEADO ===== */}
@@ -383,6 +426,21 @@ export default function EmpleadosModule() {
             <select value={newForm.role} onChange={e => setNewForm(f => ({ ...f, role: e.target.value }))}>
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
             </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Accesos a Módulos (Apartados)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
+              {AVAILABLE_MODULES.map(m => (
+                <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={newForm.access_modules.includes(m.id)}
+                    onChange={() => toggleModule(setNewForm, m.id)}
+                  />
+                  {m.label}
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       </Modal>

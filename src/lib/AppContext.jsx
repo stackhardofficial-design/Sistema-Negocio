@@ -38,6 +38,20 @@ export function AppProvider({ children }) {
   const isAdmin = useCallback(() => hasRole('admin') || hasRole('super_admin'), [hasRole])
   const isVendedor = useCallback(() => true, []) // All logged-in users can sell
 
+  const hasModuleAccess = useCallback((item) => {
+    if (!userInfo) return false
+    if (hasRole('super_admin')) return true
+
+    // Si tiene accesos explícitos configurados
+    if (userInfo.access_modules && Array.isArray(userInfo.access_modules)) {
+      return userInfo.access_modules.includes(item.id)
+    }
+
+    // Fallback a lógica legacy por roles
+    if (item.roles && item.roles.length > 0) return item.roles.some(r => hasRole(r))
+    return !hasRole('super_admin')
+  }, [userInfo, hasRole])
+
   return (
     <AppContext.Provider value={{
       user, setUser,
@@ -48,7 +62,7 @@ export function AppProvider({ children }) {
       mobileNavOpen, setMobileNavOpen,
       aiOpen, setAiOpen,
       toasts, toast, dismissToast,
-      hasRole, isSuperAdmin, isAdmin, isVendedor
+      hasRole, isSuperAdmin, isAdmin, isVendedor, hasModuleAccess
     }}>
       {children}
     </AppContext.Provider>

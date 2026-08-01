@@ -98,7 +98,7 @@ export async function dbCreateUser(email, password, userData) {
 }
 
 // Crear usuario dentro de un tenant usando signUp (funciona con anon key)
-export async function dbCreateUserForTenant(tenantId, email, password, name, role = 'vendedor') {
+export async function dbCreateUserForTenant(tenantId, email, password, name, role = 'vendedor', accessModules = null) {
   // 1. Verificar que el email no esté ya registrado en este tenant
   const { data: existing } = await sb.from('users').select('id').eq('email', email).maybeSingle()
   if (existing) throw new Error(`El email ${email} ya está registrado en el sistema`)
@@ -121,6 +121,7 @@ export async function dbCreateUserForTenant(tenantId, email, password, name, rol
     email,
     name: name || email.split('@')[0],
     role,
+    access_modules: accessModules,
     is_active: true
   }).select().single()
 

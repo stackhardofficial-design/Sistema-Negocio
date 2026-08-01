@@ -24,7 +24,7 @@ const MENU_ITEMS = [
 ]
 
 export default function MobileNav() {
-  const { hasRole } = useApp()
+  const { hasRole, hasModuleAccess } = useApp()
   const [deferredPrompt, setDeferredPrompt] = useState(null)
 
   useEffect(() => {
@@ -55,8 +55,8 @@ export default function MobileNav() {
   }
 
   const visibleItems = MENU_ITEMS.filter(item => {
-    if (item.roles.length > 0) return item.roles.some(r => hasRole(r))
-    return !hasRole('super_admin')
+    if (hasRole('super_admin')) return item.id === 'superadmin'
+    return hasModuleAccess(item)
   })
 
   return (
