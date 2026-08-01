@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { NavLink } from 'react-router-dom'
 import { useApp } from '../lib/AppContext'
 import {
   LayoutDashboard, ShoppingCart, Package, Layers,
@@ -23,7 +24,7 @@ const MENU_ITEMS = [
 ]
 
 export default function MobileNav() {
-  const { currentModule, setCurrentModule, hasRole } = useApp()
+  const { hasRole } = useApp()
   const [deferredPrompt, setDeferredPrompt] = useState(null)
 
   useEffect(() => {
@@ -63,20 +64,20 @@ export default function MobileNav() {
       <div className="mobile-nav-inner">
         {visibleItems.map(item => {
           const Icon = item.icon
-          const active = currentModule === item.id
           return (
-            <button
+            <NavLink
+              to={`/${item.id}`}
               key={item.id}
-              onClick={() => setCurrentModule(item.id)}
-              className={`mobile-nav-btn ${active ? 'active' : ''}`}
-              style={{
-                background: active ? 'var(--accent-soft)' : 'none',
-                borderRadius: '10px'
-              }}
+              className={({ isActive }) => `mobile-nav-btn ${isActive ? 'active' : ''}`}
+              style={({ isActive }) => ({
+                background: isActive ? 'var(--accent-soft)' : 'none',
+                borderRadius: '10px',
+                textDecoration: 'none'
+              })}
             >
               <Icon />
               {item.label}
-            </button>
+            </NavLink>
           )
         })}
         {deferredPrompt && (

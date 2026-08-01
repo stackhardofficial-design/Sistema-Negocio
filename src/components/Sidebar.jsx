@@ -1,4 +1,5 @@
 import { useApp } from '../lib/AppContext'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package, Layers,
   Coffee, Users, ClipboardList, Settings, LogOut,
@@ -23,7 +24,7 @@ const MENU_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { currentModule, setCurrentModule, sidebarCollapsed, setSidebarCollapsed,
+  const { sidebarCollapsed, setSidebarCollapsed,
     userInfo, tenant, hasRole } = useApp()
 
   const visibleItems = MENU_ITEMS.filter(item => {
@@ -95,50 +96,38 @@ export default function Sidebar() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {visibleItems.map(item => {
             const Icon = item.icon
-            const active = currentModule === item.id
             return (
-              <button
+              <NavLink
+                to={`/${item.id}`}
                 key={item.id}
-                onClick={() => setCurrentModule(item.id)}
                 title={sidebarCollapsed ? item.label : ''}
-                style={{
+                style={({ isActive }) => ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
                   padding: sidebarCollapsed ? '10px 14px' : '10px 14px',
                   borderRadius: '10px',
-                  background: active ? 'var(--accent-soft)' : 'transparent',
-                  color: active ? 'var(--accent)' : 'var(--text-secondary)',
-                  border: active ? '1px solid rgba(245,158,11,0.2)' : '1px solid transparent',
+                  background: isActive ? 'var(--accent-soft)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                  border: isActive ? '1px solid rgba(245,158,11,0.2)' : '1px solid transparent',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
-                  fontWeight: active ? 600 : 400,
+                  fontWeight: isActive ? 600 : 400,
                   fontSize: '0.875rem',
                   width: '100%',
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-                onMouseEnter={e => {
-                  if (!active) {
-                    e.currentTarget.style.background = 'var(--bg-tertiary)'
-                    e.currentTarget.style.color = 'var(--text-primary)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!active) {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = 'var(--text-secondary)'
-                  }
-                }}
+                  textOverflow: 'ellipsis',
+                  textDecoration: 'none'
+                })}
               >
                 <Icon size={18} style={{ flexShrink: 0 }} />
                 {!sidebarCollapsed && item.label}
                 {item.id === 'superadmin' && !sidebarCollapsed && (
                   <span className="badge badge-warning" style={{ marginLeft: 'auto', fontSize: '0.65rem', padding: '2px 6px' }}>SA</span>
                 )}
-              </button>
+              </NavLink>
             )
           })}
         </div>

@@ -7,7 +7,6 @@ export function AppProvider({ children }) {
   const [userInfo, setUserInfo] = useState(null)  // { name, role, roles[], tenant_id, tenants{} }
   const [tenantId, setTenantId] = useState(null)
   const [tenant, setTenant] = useState(null)
-  const [currentModule, setCurrentModule] = useState('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
@@ -45,7 +44,6 @@ export function AppProvider({ children }) {
       userInfo, setUserInfo,
       tenantId, setTenantId,
       tenant, setTenant,
-      currentModule, setCurrentModule,
       sidebarCollapsed, setSidebarCollapsed,
       mobileNavOpen, setMobileNavOpen,
       aiOpen, setAiOpen,

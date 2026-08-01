@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AppProvider, useApp } from './lib/AppContext.jsx'
 import { dbGetSession, dbGetUserInfo, dbGetTenant } from './lib/supabase.js'
 import Login from './components/Login.jsx'
@@ -20,28 +21,13 @@ import ConfiguracionModule from './modules/configuracion/ConfiguracionModule.jsx
 import FinanzasModule from './modules/finanzas/FinanzasModule.jsx'
 import './index.css'
 
-const MODULE_MAP = {
-  dashboard: DashboardModule,
-  ventas: VentasModule,
-  registro_ventas: RegistroVentasModule,
-  productos: ProductosModule,
-  stock: StockModule,
-  buffet: BuffetModule,
-  finanzas: FinanzasModule,
-  deudores: DeudoresModule,
-  empleados: EmpleadosModule,
-  historial: HistorialModule,
-  superadmin: SuperAdminModule,
-  configuracion: ConfiguracionModule
-}
 
 function AppShell() {
   const {
     user, setUser,
     userInfo, setUserInfo,
     tenantId, setTenantId,
-    tenant, setTenant,
-    currentModule, setCurrentModule
+    tenant, setTenant
   } = useApp()
   const [loading, setLoading] = useState(true)
 
@@ -60,7 +46,7 @@ function AppShell() {
               if (t) setTenant(t)
             }
             if (info.role === 'super_admin') {
-              setCurrentModule('superadmin')
+              // Now handled by Navigation if necessary
             }
           }
         }
@@ -92,8 +78,6 @@ function AppShell() {
 
   if (!user) return <Login />
 
-  const ActiveModule = MODULE_MAP[currentModule] || DashboardModule
-
   return (
     <div className="app-layout">
       {/* Desktop Sidebar */}
@@ -101,7 +85,22 @@ function AppShell() {
 
       {/* Main Content */}
       <main className="workspace">
-        <ActiveModule />
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardModule />} />
+          <Route path="/ventas" element={<VentasModule />} />
+          <Route path="/registro_ventas" element={<RegistroVentasModule />} />
+          <Route path="/productos" element={<ProductosModule />} />
+          <Route path="/stock" element={<StockModule />} />
+          <Route path="/buffet" element={<BuffetModule />} />
+          <Route path="/finanzas" element={<FinanzasModule />} />
+          <Route path="/deudores" element={<DeudoresModule />} />
+          <Route path="/empleados" element={<EmpleadosModule />} />
+          <Route path="/historial" element={<HistorialModule />} />
+          <Route path="/superadmin" element={<SuperAdminModule />} />
+          <Route path="/configuracion" element={<ConfiguracionModule />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </main>
 
       {/* Mobile Bottom Nav */}
@@ -115,9 +114,11 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppShell />
-      <ToastContainer />
-    </AppProvider>
+    <BrowserRouter>
+      <AppProvider>
+        <AppShell />
+        <ToastContainer />
+      </AppProvider>
+    </BrowserRouter>
   )
 }
