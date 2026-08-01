@@ -61,7 +61,7 @@ export default function HistorialModule() {
   useEffect(() => {
     if (!tenantId) return
     const channel = sb.channel('historial_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs', filter: `tenant_id=eq.${tenantId}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log', filter: `tenant_id=eq.${tenantId}` }, () => load())
       .subscribe()
     return () => { sb.removeChannel(channel) }
   }, [tenantId])

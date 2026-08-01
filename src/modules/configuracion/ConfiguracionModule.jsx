@@ -28,7 +28,7 @@ export default function ConfiguracionModule() {
   useEffect(() => {
     if (!tenantId) return
     const channel = sb.channel('config_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_categories', filter: `tenant_id=eq.${tenantId}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories', filter: `tenant_id=eq.${tenantId}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tenants', filter: `id=eq.${tenantId}` }, () => load())
       .subscribe()
     return () => { sb.removeChannel(channel) }

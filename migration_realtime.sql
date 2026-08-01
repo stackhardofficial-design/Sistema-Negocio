@@ -8,10 +8,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE products;
 ALTER PUBLICATION supabase_realtime ADD TABLE sales;
 ALTER PUBLICATION supabase_realtime ADD TABLE sale_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE debtors;
-ALTER PUBLICATION supabase_realtime ADD TABLE debt_payments;
+ALTER PUBLICATION supabase_realtime ADD TABLE debtor_payments;
+ALTER PUBLICATION supabase_realtime ADD TABLE debtor_charges;
 ALTER PUBLICATION supabase_realtime ADD TABLE product_categories;
 ALTER PUBLICATION supabase_realtime ADD TABLE tenants;
 ALTER PUBLICATION supabase_realtime ADD TABLE users;
-ALTER PUBLICATION supabase_realtime ADD TABLE activity_logs;
+ALTER PUBLICATION supabase_realtime ADD TABLE activity_log;
 
 -- Nota: 'expenses' y 'expense_categories' ya fueron añadidas en la migración de finanzas.
