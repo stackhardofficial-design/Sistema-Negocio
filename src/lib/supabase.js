@@ -228,7 +228,7 @@ export async function lookupBarcode(barcode) {
 // ===== SALES =====
 export async function dbGetSales(tenantId, opts = {}) {
   let q = sb.from('sales')
-    .select('*, sale_items(*, products(name, barcode)), users!sales_user_id_fkey(name)')
+    .select('*, sale_items(*, products(name, barcode, categories(name))), users!sales_user_id_fkey(name)')
     .eq('tenant_id', tenantId)
 
   if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
