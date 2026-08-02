@@ -203,7 +203,7 @@ export default function StockModule() {
                   <th style={{ textAlign: 'right' }}>Stock actual</th>
                   <th style={{ textAlign: 'right' }}>Stock mín.</th>
                   <th>Estado</th>
-                  {isAdmin() && <th>Editar stock</th>}
+                  <th>Editar stock</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,27 +249,25 @@ export default function StockModule() {
                           : p.stock === null ? <span className="badge badge-neutral">Ilimitado</span>
                           : <span className="badge badge-success">OK</span>}
                       </td>
-                      {isAdmin() && (
-                        <td>
-                          {isEditing ? (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={() => saveStock(p)} className="btn btn-success btn-sm">
-                                <Check size={12} />
-                              </button>
-                              <button onClick={() => setEditingId(null)} className="btn btn-secondary btn-sm">
-                                <X size={12} />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => { setEditingId(p.id); setEditValue(p.stock ?? '') }}
-                              className="btn btn-secondary btn-sm"
-                            >
-                              <Edit2 size={12} /> Ajustar
+                      <td>
+                        {isEditing ? (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button onClick={() => saveStock(p)} className="btn btn-success btn-sm">
+                              <Check size={12} />
                             </button>
-                          )}
-                        </td>
-                      )}
+                            <button onClick={() => setEditingId(null)} className="btn btn-secondary btn-sm">
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingId(p.id); setEditValue(p.stock ?? '') }}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <Edit2 size={12} /> Ajustar
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}

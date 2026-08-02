@@ -255,11 +255,9 @@ export default function ProductosModule() {
           <button onClick={load} className="btn btn-secondary btn-sm">
             <RefreshCw size={14} />
           </button>
-          {isAdmin() && (
-            <button onClick={openCreate} className="btn btn-primary">
-              <Plus size={16} /> Nuevo producto
-            </button>
-          )}
+          <button onClick={openCreate} className="btn btn-primary">
+            <Plus size={16} /> Nuevo producto
+          </button>
         </div>
       </div>
 
@@ -286,16 +284,14 @@ export default function ProductosModule() {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            {isAdmin() && (
-              <button 
-                onClick={() => setCatModal({ open: true, name: '' })} 
-                className="btn btn-secondary"
-                style={{ padding: '8px 12px' }}
-                title="Gestionar categorías"
-              >
-                <Tag size={16} /> <span className="hide-on-mobile">Categorías</span>
-              </button>
-            )}
+            <button 
+              onClick={() => setCatModal({ open: true, name: '' })} 
+              className="btn btn-secondary"
+              style={{ padding: '8px 12px' }}
+              title="Gestionar categorías"
+            >
+              <Tag size={16} /> <span className="hide-on-mobile">Categorías</span>
+            </button>
           </div>
         </div>
 
@@ -322,13 +318,13 @@ export default function ProductosModule() {
                   <th style={{ textAlign: 'right' }}>Margen</th>
                   <th style={{ textAlign: 'right' }}>Stock</th>
                   <th>Estado</th>
-                  {isAdmin() && <th>Acciones</th>}
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin() ? 9 : 8}>
+                    <td colSpan={9}>
                       <div className="empty-state">
                         <Package size={32} />
                         <p>Sin productos</p>
@@ -374,18 +370,16 @@ export default function ProductosModule() {
                           {p.is_active ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
-                      {isAdmin() && (
-                        <td>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => openEdit(p)} className="btn btn-secondary btn-sm">
-                              <Edit2 size={12} />
-                            </button>
-                            <button onClick={() => handleDelete(p)} className="btn btn-danger btn-sm">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      )}
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button onClick={() => openEdit(p)} className="btn btn-secondary btn-sm">
+                            <Edit2 size={12} />
+                          </button>
+                          <button onClick={() => handleDelete(p)} className="btn btn-danger btn-sm">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
