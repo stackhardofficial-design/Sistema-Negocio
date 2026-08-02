@@ -371,8 +371,8 @@ export default function FinanzasModule() {
                   </div>
                 </div>
 
-                <div className="table-responsive">
-                  <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
+                  <table className="table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-tertiary)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Fecha</th>
