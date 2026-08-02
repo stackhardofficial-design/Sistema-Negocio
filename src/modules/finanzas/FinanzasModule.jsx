@@ -145,11 +145,14 @@ export default function FinanzasModule() {
     }
   }
 
-  async function handleDeleteCategory(id) {
+  async function handleDeleteCategory(category) {
+    if (category.name === 'Compra Mercadería') {
+      return toast('La categoría "Compra Mercadería" es obligatoria para el sistema de stock y no puede eliminarse', 'warning')
+    }
     if (!confirm('¿Eliminar categoría? Los gastos asociados quedarán sin categoría.')) return
     try {
-      await dbDeleteExpenseCategory(id)
-      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'category', id)
+      await dbDeleteExpenseCategory(category.id)
+      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'category', category.id)
       load()
     } catch (err) {
       toast('Error al eliminar categoría', 'danger')
@@ -509,9 +512,11 @@ export default function FinanzasModule() {
                   {categories.map(cat => (
                     <div key={cat.id} className="card" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 500 }}>{cat.name}</span>
-                      <button onClick={() => handleDeleteCategory(cat.id)} className="btn-icon text-danger">
-                        <Trash2 size={16} />
-                      </button>
+                      {cat.name !== 'Compra Mercadería' && (
+                        <button onClick={() => handleDeleteCategory(cat)} className="btn-icon text-danger" title="Eliminar categoría">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
