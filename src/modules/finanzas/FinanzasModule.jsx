@@ -205,8 +205,26 @@ export default function FinanzasModule() {
       }
     } catch {}
     // Compatibility for older formats
-    if (desc.includes(' u. de "') && desc.includes('costo unitario:')) {
-      return { isProduct: false, text: desc }
+    if (desc.includes(' u. de "') && desc.includes('(costo unitario:')) {
+      const match = desc.match(/^(-?\d+)\s+u\.\s+de\s+"(.*)"\s+\(costo unitario:\s+\$([^)]+)\)$/)
+      if (match) {
+        const qty = parseInt(match[1], 10)
+        const name = match[2]
+        const unitCostStr = match[3]
+        const normalizedStr = unitCostStr.replace(/\./g, '').replace(',', '.')
+        const unit_cost = parseFloat(normalizedStr) || 0
+
+        return {
+          isProduct: true,
+          data: {
+            _type: 'stock_restock',
+            qty,
+            name,
+            barcode: '',
+            unit_cost
+          }
+        }
+      }
     }
     return { isProduct: false, text: desc }
   }
