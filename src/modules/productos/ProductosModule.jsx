@@ -19,6 +19,84 @@ const EMPTY_PRODUCT = {
   description: '', is_active: true, register_initial_expense: false
 }
 
+function SearchableCategorySelect({ value, onChange, categories }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selected = categories.find(c => c.id === value)
+  const filtered = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flex: 1 }}>
+      <div 
+        onClick={() => { setOpen(!open); setSearch('') }}
+        style={{
+          border: '1px solid var(--border)', padding: '9px 12px', borderRadius: 'var(--radius-md)',
+          background: 'var(--bg-primary)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', minHeight: '38px', fontSize: '0.9rem'
+        }}
+      >
+        <span style={{ color: selected ? 'var(--text-primary)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {selected ? selected.name : 'Seleccionar categoría...'}
+        </span>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '8px' }}>▼</span>
+      </div>
+      
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+          background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+          marginTop: '4px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxHeight: '250px', display: 'flex', flexDirection: 'column'
+        }}>
+          <div style={{ padding: '8px', borderBottom: '1px solid var(--border-soft)' }}>
+            <input 
+              type="text" 
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar..."
+              style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.85rem' }}
+              autoFocus
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            <div
+               onClick={() => { onChange(''); setOpen(false) }}
+               style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-muted)', fontSize: '0.85rem' }}
+            >
+              Sin categoría
+            </div>
+            {filtered.map(c => (
+              <div 
+                key={c.id} 
+                onClick={() => { onChange(c.id); setOpen(false) }}
+                style={{ 
+                  padding: '10px 12px', cursor: 'pointer', fontSize: '0.85rem',
+                  background: value === c.id ? 'var(--accent-soft)' : 'transparent',
+                  color: value === c.id ? 'var(--accent)' : 'var(--text-primary)'
+                }}
+              >
+                {c.name}
+              </div>
+            ))}
+            {filtered.length === 0 && <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No se encontraron categorías</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 export default function ProductosModule() {
   const { tenantId, userInfo, toast, isAdmin } = useApp()
   const [products, setProducts] = useState([])
@@ -88,7 +166,8 @@ export default function ProductosModule() {
   }, [tenantId])
 
   function openCreate() {
-    setForm(EMPTY_PRODUCT)
+    const lastCategory = localStorage.getItem('last_product_category') || ''
+    setForm({ ...EMPTY_PRODUCT, category_id: lastCategory })
     setModal({ open: true, edit: null })
   }
 
@@ -131,6 +210,7 @@ export default function ProductosModule() {
     if (!form.name.trim()) return toast('El nombre es obligatorio', 'warning')
     if (!form.price) return toast('El precio de venta es obligatorio', 'warning')
 
+    localStorage.setItem('last_product_category', form.category_id || '')
     setSaving(true)
     try {
       const payload = {
@@ -449,16 +529,11 @@ export default function ProductosModule() {
             <div className="form-group">
               <label className="form-label">Categoría</label>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <select
+                <SearchableCategorySelect
                   value={form.category_id}
-                  onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}
-                  style={{ flex: 1 }}
-                >
-                  <option value="">Sin categoría</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setForm(p => ({ ...p, category_id: val }))}
+                  categories={categories}
+                />
                 <button
                   type="button"
                   onClick={() => setCatModal({ open: true, name: '' })}
