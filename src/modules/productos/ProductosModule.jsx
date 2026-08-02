@@ -513,6 +513,7 @@ export default function ProductosModule() {
                   onScan={(code) => setForm(p => ({ ...p, barcode: code }))} 
                   active={modal.open} 
                   showCamera={true}
+                  autoStart={modal.open}
                 />
                 <button
                   type="button"
