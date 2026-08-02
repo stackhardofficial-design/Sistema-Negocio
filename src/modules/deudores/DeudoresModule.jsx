@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetDebtors, dbCreateDebtor, dbAddDebtorPayment,
-  dbAddDebtorCharge, dbSettleDebtor
+  dbAddDebtorCharge, dbSettleDebtor, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { BookOpen, Plus, Search, DollarSign, UserCheck, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
@@ -49,7 +49,8 @@ export default function DeudoresModule() {
     if (!newForm.name.trim()) return toast('El nombre es obligatorio', 'warning')
     setSaving(true)
     try {
-      await dbCreateDebtor(tenantId, newForm)
+      const created = await dbCreateDebtor(tenantId, newForm)
+      await dbLogActivity(tenantId, userInfo?.id, 'create', 'debtor', created.id, { name: newForm.name })
       toast('Deudor registrado', 'success')
       setNewModal(false)
       setNewForm({ name: '', phone: '', note: '' })
@@ -66,6 +67,7 @@ export default function DeudoresModule() {
     setSaving(true)
     try {
       await dbAddDebtorPayment(payModal.debtor.id, parseFloat(payForm.amount), payForm.note)
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'debtor', payModal.debtor.id, { action: 'payment', amount: payForm.amount })
       toast('Pago registrado', 'success')
       setPayModal({ open: false, debtor: null })
       setPayForm({ amount: '', note: '' })
@@ -82,6 +84,7 @@ export default function DeudoresModule() {
     setSaving(true)
     try {
       await dbAddDebtorCharge(chargeModal.debtor.id, parseFloat(chargeForm.amount), chargeForm.note)
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'debtor', chargeModal.debtor.id, { action: 'charge', amount: chargeForm.amount })
       toast('Cargo registrado', 'success')
       setChargeModal({ open: false, debtor: null })
       setChargeForm({ amount: '', note: '' })
@@ -97,6 +100,7 @@ export default function DeudoresModule() {
     if (!confirm(`¿Marcar a "${debtor.name}" como saldado?`)) return
     try {
       await dbSettleDebtor(debtor.id)
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'debtor', debtor.id, { action: 'settle' })
       toast('Deuda saldada', 'success')
       load()
     } catch (err) {

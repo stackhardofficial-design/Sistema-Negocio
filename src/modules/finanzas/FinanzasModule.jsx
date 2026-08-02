@@ -3,7 +3,7 @@ import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetExpenseCategories, dbCreateExpenseCategory, dbUpdateExpenseCategory, dbDeleteExpenseCategory,
   dbGetExpenses, dbCreateExpense, dbDeleteExpense,
-  dbGetSaleSummary, dbGetProducts
+  dbGetSaleSummary, dbGetProducts, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -95,7 +95,7 @@ export default function FinanzasModule() {
       if (expenseModal.edit) {
         // Edit flow if needed later
       } else {
-        await dbCreateExpense({
+        const created = await dbCreateExpense({
           tenant_id: tenantId,
           user_id: userInfo?.id,
           category_id: expenseForm.category_id,
@@ -104,6 +104,7 @@ export default function FinanzasModule() {
           expense_date: expenseForm.expense_date,
           expense_type: expenseForm.expense_type || 'variable'
         })
+        await dbLogActivity(tenantId, userInfo?.id, 'create', 'expense', created.id, { amount: expenseForm.amount, category_id: expenseForm.category_id })
         toast('Gasto registrado', 'success')
       }
       setExpenseModal({ open: false, edit: null })
@@ -119,6 +120,7 @@ export default function FinanzasModule() {
     if (!confirm('¿Eliminar este gasto?')) return
     try {
       await dbDeleteExpense(id)
+      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'expense', id)
       toast('Gasto eliminado', 'success')
       load()
     } catch (err) {
@@ -131,7 +133,8 @@ export default function FinanzasModule() {
     if (!catForm.name.trim()) return toast('Nombre requerido', 'warning')
     setSaving(true)
     try {
-      await dbCreateExpenseCategory(tenantId, catForm.name.trim())
+      const created = await dbCreateExpenseCategory(tenantId, catForm.name.trim())
+      await dbLogActivity(tenantId, userInfo?.id, 'create', 'category', created.id, { name: catForm.name.trim() })
       toast('Categoría creada', 'success')
       setCatModal({ open: false, edit: null })
       load()
@@ -146,6 +149,7 @@ export default function FinanzasModule() {
     if (!confirm('¿Eliminar categoría? Los gastos asociados quedarán sin categoría.')) return
     try {
       await dbDeleteExpenseCategory(id)
+      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'category', id)
       load()
     } catch (err) {
       toast('Error al eliminar categoría', 'danger')

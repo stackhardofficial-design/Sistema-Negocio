@@ -4,7 +4,7 @@ import {
   sb, dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
   dbGetIngredients, dbCreateIngredient, dbUpdateIngredient, dbDeleteIngredient,
   dbSetBuffetIngredients, dbGetBuffetOrders,
-  dbCreateBuffetOrder, dbUpdateBuffetOrderStatus
+  dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X } from 'lucide-react'
@@ -100,10 +100,12 @@ export default function BuffetModule() {
       if (productModal.edit) {
         const updated = await dbUpdateBuffetProduct(productModal.edit.id, payload)
         id = updated.id
+        await dbLogActivity(tenantId, userInfo?.id, 'update', 'buffet_product', id, { name: form.name.trim() })
         toast('Producto buffet actualizado', 'success')
       } else {
         const created = await dbCreateBuffetProduct(payload)
         id = created.id
+        await dbLogActivity(tenantId, userInfo?.id, 'create', 'buffet_product', id, { name: form.name.trim() })
         toast('Producto buffet creado', 'success')
       }
       await dbSetBuffetIngredients(id, form.ingredients)
@@ -173,9 +175,11 @@ export default function BuffetModule() {
       }
       if (ingredientModal.edit) {
         await dbUpdateIngredient(ingredientModal.edit.id, payload)
+        await dbLogActivity(tenantId, userInfo?.id, 'update', 'ingredient', ingredientModal.edit.id, { name: ingForm.name.trim() })
         toast('Ingrediente actualizado', 'success')
       } else {
-        await dbCreateIngredient(payload)
+        const created = await dbCreateIngredient(payload)
+        await dbLogActivity(tenantId, userInfo?.id, 'create', 'ingredient', created.id, { name: ingForm.name.trim() })
         toast('Ingrediente creado', 'success')
       }
       setIngredientModal({ open: false, edit: null })
@@ -191,6 +195,7 @@ export default function BuffetModule() {
     if (!confirm('¿Eliminar este ingrediente?')) return
     try {
       await dbDeleteIngredient(id)
+      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'ingredient', id)
       toast('Ingrediente eliminado', 'info')
       load()
     } catch (err) {
@@ -210,7 +215,8 @@ export default function BuffetModule() {
   async function placeOrder() {
     if (orderCart.length === 0) return toast('El pedido está vacío', 'warning')
     try {
-      await dbCreateBuffetOrder(tenantId, userInfo?.id, orderCart, customerName || null)
+      const created = await dbCreateBuffetOrder(tenantId, userInfo?.id, orderCart, customerName || null)
+      await dbLogActivity(tenantId, userInfo?.id, 'create', 'buffet_order', created.id, { items: orderCart.length })
       setOrderCart([])
       setCustomerName('')
       setOrderModal({ open: false })
@@ -223,6 +229,7 @@ export default function BuffetModule() {
   async function changeOrderStatus(orderId, status) {
     try {
       await dbUpdateBuffetOrderStatus(orderId, status)
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'buffet_order', orderId, { status })
       load()
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')

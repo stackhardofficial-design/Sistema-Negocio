@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant } from '../../lib/supabase'
+import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant, dbLogActivity } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Settings, Plus, Edit2, Trash2, Tag, Building2 } from 'lucide-react'
 
@@ -40,9 +40,11 @@ export default function ConfiguracionModule() {
     try {
       if (catModal.edit) {
         await dbUpdateCategory(catModal.edit.id, { name: catForm.name.trim(), icon: catForm.icon || null })
+        await dbLogActivity(tenantId, userInfo?.id, 'update', 'category', catModal.edit.id, { name: catForm.name.trim() })
         toast('Categoría actualizada', 'success')
       } else {
-        await dbCreateCategory(tenantId, catForm.name.trim(), catForm.icon || null)
+        const created = await dbCreateCategory(tenantId, catForm.name.trim(), catForm.icon || null)
+        await dbLogActivity(tenantId, userInfo?.id, 'create', 'category', created.id, { name: catForm.name.trim() })
         toast('Categoría creada', 'success')
       }
       setCatModal({ open: false, edit: null })
@@ -59,6 +61,7 @@ export default function ConfiguracionModule() {
     if (!confirm(`¿Eliminar categoría "${cat.name}"?`)) return
     try {
       await dbDeleteCategory(cat.id)
+      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'category', cat.id, { name: cat.name })
       toast('Categoría eliminada', 'success')
       load()
     } catch (err) {
@@ -71,6 +74,7 @@ export default function ConfiguracionModule() {
     setSavingTenant(true)
     try {
       const updated = await dbUpdateTenant(tenantId, { name: tenantForm.name.trim() })
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'tenant', tenantId, { name: tenantForm.name.trim() })
       setTenant(updated)
       toast('Configuración guardada', 'success')
     } catch (err) {

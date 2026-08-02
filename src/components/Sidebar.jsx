@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, ShoppingBag, Crown,
   BookOpen, TrendingUp, Receipt
 } from 'lucide-react'
-import { dbLogout } from '../lib/supabase'
+import { dbLogout, dbLogActivity } from '../lib/supabase'
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [] },
@@ -36,6 +36,9 @@ export default function Sidebar() {
 
   async function handleLogout() {
     try {
+      if (userInfo?.tenant_id) {
+        await dbLogActivity(userInfo.tenant_id, userInfo.id, 'logout', 'user', userInfo.id)
+      }
       await dbLogout()
     } catch (e) {
       console.error('Logout error:', e)

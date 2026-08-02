@@ -28,7 +28,11 @@ const ENTITY_LABELS = {
   user: 'Usuario',
   debtor: 'Deudor',
   buffet_product: 'Producto Buffet',
-  category: 'Categoría'
+  buffet_order: 'Pedido Buffet',
+  ingredient: 'Ingrediente',
+  category: 'Categoría',
+  expense: 'Gasto',
+  tenant: 'Configuración'
 }
 
 export default function HistorialModule() {
