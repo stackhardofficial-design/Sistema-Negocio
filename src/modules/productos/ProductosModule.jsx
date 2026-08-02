@@ -110,9 +110,46 @@ export default function ProductosModule() {
   const barcodeInputRef = useRef(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [catModal, setCatModal] = useState({ open: false, name: '' })
-
+  const [expenseConfirmModal, setExpenseConfirmModal] = useState({ open: false, product: null, added: 0, cost: 0 })
+  const [savingExpense, setSavingExpense] = useState(false)
 
   const [savingCat, setSavingCat] = useState(false)
+
+  async function handleConfirmExpense(registerExpense) {
+    let { product, added, cost } = expenseConfirmModal
+    if (registerExpense) {
+      if (isNaN(cost)) return toast('Por favor, ingresá un valor numérico válido', 'warning')
+      if (added > 0 && cost <= 0) return toast('El costo debe ser mayor a 0 para ingresos', 'warning')
+      if (added < 0 && cost >= 0) return toast('El ajuste debe ser negativo (ej: -500) para devoluciones', 'warning')
+    }
+    setSavingExpense(true)
+    try {
+      if (registerExpense) {
+        const category = await dbEnsureExpenseCategory(tenantId, 'Compra Mercadería')
+        await dbCreateExpense({
+          tenant_id: tenantId,
+          user_id: userInfo?.id,
+          category_id: category.id,
+          amount: cost,
+          description: JSON.stringify({
+            _type: 'stock_restock',
+            qty: added,
+            name: product.name,
+            barcode: product.barcode || '',
+            unit_cost: product.cost_price || 0
+          }),
+          expense_date: new Date().toISOString().split('T')[0],
+          expense_type: 'variable'
+        })
+        toast(`Gasto de ${formatMoney(cost)} registrado en Caja ✓`, 'success')
+      }
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSavingExpense(false)
+      setExpenseConfirmModal({ open: false, product: null, added: 0, cost: 0 })
+    }
+  }
 
   async function handleSaveCategory() {
     if (!catModal.name.trim()) return toast('El nombre es obligatorio', 'warning')
@@ -181,8 +218,7 @@ export default function ProductosModule() {
       stock: product.stock ?? '',
       min_stock: product.min_stock ?? '',
       description: product.description || '',
-      is_active: product.is_active ?? true,
-      register_initial_expense: false
+      is_active: product.is_active ?? true
     })
     setModal({ open: true, edit: product })
   }
@@ -226,67 +262,34 @@ export default function ProductosModule() {
         is_active: form.is_active
       }
 
+      let createdProduct = null;
       if (modal.edit) {
         await dbUpdateProduct(modal.edit.id, payload)
         await dbLogActivity(tenantId, userInfo?.id, 'update', 'product', modal.edit.id, { name: form.name })
         toast('Producto actualizado', 'success')
-
-        const oldStock = modal.edit.stock !== null && modal.edit.stock !== undefined ? modal.edit.stock : 0;
-        const newStock = form.stock !== '' ? parseInt(form.stock) : 0;
-        if (newStock > oldStock && form.register_initial_expense && form.cost_price && parseFloat(form.cost_price) > 0) {
-          try {
-            const category = await dbEnsureExpenseCategory(tenantId, 'Compra Mercadería')
-            const addedStock = newStock - oldStock
-            const cost = addedStock * parseFloat(form.cost_price)
-            await dbCreateExpense({
-              tenant_id: tenantId,
-              user_id: userInfo?.id,
-              category_id: category.id,
-              amount: cost,
-              description: JSON.stringify({
-                _type: 'stock_restock',
-                qty: addedStock,
-                name: form.name,
-                barcode: form.barcode || '',
-                unit_cost: parseFloat(form.cost_price)
-              }),
-              expense_date: new Date().toISOString().split('T')[0],
-              expense_type: 'variable'
-            })
-            toast(`Gasto por reposición de stock registrado: ${formatMoney(cost)} ✓`, 'success')
-          } catch(err) {
-            toast(`Error al registrar gasto: ${err.message}`, 'warning')
-          }
-        }
+        createdProduct = { ...modal.edit, ...payload }
       } else {
         const created = await dbCreateProduct(payload)
         await dbLogActivity(tenantId, userInfo?.id, 'create', 'product', created.id, { name: form.name })
         toast('Producto creado', 'success')
-        
-        if (form.stock && parseInt(form.stock) > 0 && form.register_initial_expense && form.cost_price && parseFloat(form.cost_price) > 0) {
-          try {
-            const category = await dbEnsureExpenseCategory(tenantId, 'Compra Mercadería')
-            const cost = parseInt(form.stock) * parseFloat(form.cost_price)
-            await dbCreateExpense({
-              tenant_id: tenantId,
-              user_id: userInfo?.id,
-              category_id: category.id,
-              amount: cost,
-              description: JSON.stringify({
-                _type: 'stock_restock',
-                qty: parseInt(form.stock),
-                name: form.name,
-                barcode: form.barcode || '',
-                unit_cost: parseFloat(form.cost_price)
-              }),
-              expense_date: new Date().toISOString().split('T')[0],
-              expense_type: 'variable'
-            })
-            toast(`Gasto inicial registrado en Caja: ${formatMoney(cost)} ✓`, 'success')
-          } catch(err) {
-            toast(`Gasto inicial falló: ${err.message}`, 'warning')
-          }
-        }
+        createdProduct = { ...payload, id: created.id }
+      }
+
+      const oldStock = modal.edit && modal.edit.stock !== null && modal.edit.stock !== undefined ? modal.edit.stock : 0;
+      const newStock = form.stock !== '' ? parseInt(form.stock) : 0;
+      const added = newStock - oldStock;
+
+      if (added !== 0) {
+        const suggestedCost = form.cost_price ? (form.cost_price * added) : ''
+        setModal({ open: false, edit: null })
+        setExpenseConfirmModal({
+          open: true,
+          product: createdProduct,
+          added,
+          cost: suggestedCost
+        })
+        load()
+        return
       }
 
       setModal({ open: false, edit: null })
@@ -605,32 +608,6 @@ export default function ProductosModule() {
             </div>
           </div>
 
-          {(() => {
-            const isEditing = !!modal.edit;
-            const oldStock = isEditing && modal.edit.stock !== null && modal.edit.stock !== undefined ? modal.edit.stock : 0;
-            const newStock = form.stock !== '' ? parseInt(form.stock) : 0;
-            const addedStock = isEditing ? (newStock > oldStock ? newStock - oldStock : 0) : newStock;
-            
-            if (addedStock > 0 && form.cost_price > 0) {
-              const cost = addedStock * parseFloat(form.cost_price);
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--accent-soft)', padding: '12px', borderRadius: '8px', border: '1px solid var(--accent)' }}>
-                  <input
-                    type="checkbox"
-                    id="register_initial_expense"
-                    checked={form.register_initial_expense}
-                    onChange={e => setForm(p => ({ ...p, register_initial_expense: e.target.checked }))}
-                    style={{ width: 'auto' }}
-                  />
-                  <label htmlFor="register_initial_expense" className="form-label" style={{ cursor: 'pointer', margin: 0, fontWeight: 500, color: 'var(--accent)' }}>
-                    Registrar gasto en Caja por {formatMoney(cost)}
-                  </label>
-                </div>
-              )
-            }
-            return null;
-          })()}
-
           <div className="form-group">
             <label className="form-label">Descripción (opcional)</label>
             <input
@@ -696,6 +673,74 @@ export default function ProductosModule() {
               ))}
             </tbody>
           </table>
+        </div>
+    </Modal>
+
+      {/* ===== MODAL Confirmar Gasto ===== */}
+      <Modal
+        open={expenseConfirmModal.open}
+        onClose={() => setExpenseConfirmModal({ open: false, product: null, added: 0, cost: 0 })}
+        title="Stock Actualizado"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{
+            background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--border)', display: 'flex', gap: '16px', alignItems: 'flex-start'
+          }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px', background: expenseConfirmModal.added > 0 ? 'var(--accent-soft)' : 'var(--danger-soft)',
+              color: expenseConfirmModal.added > 0 ? 'var(--accent)' : 'var(--danger)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Package size={24} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                Estás {expenseConfirmModal.added > 0 ? 'sumando' : 'restando'} {Math.abs(expenseConfirmModal.added)} unidades de<br />
+                <span style={{ color: expenseConfirmModal.added > 0 ? 'var(--accent)' : 'var(--danger)' }}>"{expenseConfirmModal.product?.name}"</span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                Costo unitario registrado: <strong>{formatMoney(expenseConfirmModal.product?.cost_price)}</strong><br />
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {expenseConfirmModal.added > 0 ? 'Costo total de esta compra:' : 'Ajuste a favor en Caja (negativo):'}
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>$</span>
+                    <input 
+                      type="number" 
+                      value={expenseConfirmModal.cost} 
+                      onChange={e => setExpenseConfirmModal(prev => ({ ...prev, cost: e.target.value ? parseFloat(e.target.value) : '' }))}
+                      className="input-sm"
+                      style={{ fontSize: '1.1rem', fontWeight: 700, width: '120px' }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            ¿Querés registrar automáticamente este importe como {expenseConfirmModal.added > 0 ? 'gasto de' : 'ajuste de'} <em>Compra de Mercadería</em> en la Caja?
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              onClick={() => handleConfirmExpense(true)}
+              disabled={savingExpense}
+              className="btn btn-primary"
+            >
+              {savingExpense ? 'Guardando...' : `✓ Sí, registrar ${expenseConfirmModal.added > 0 ? 'gasto' : 'ajuste'}${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
+            </button>
+            <button
+              onClick={() => handleConfirmExpense(false)}
+              disabled={savingExpense}
+              className="btn btn-secondary"
+            >
+              Solo actualizar producto, sin registrar gasto
+            </button>
+          </div>
         </div>
       </Modal>
     </div>
