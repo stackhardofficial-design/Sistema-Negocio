@@ -67,7 +67,7 @@ export default function StockModule() {
     try {
       await dbUpdateProductStock(product.id, newStock)
       await dbLogActivity(tenantId, userInfo?.id, 'update_stock', 'product', product.id, {
-        name: product.name, old: oldStock, new: newStock
+        name: product.name, barcode: product.barcode, old: oldStock, new: newStock
       })
       toast(`Stock de "${product.name}" actualizado a ${newStock}`, 'success')
       setEditingId(null)

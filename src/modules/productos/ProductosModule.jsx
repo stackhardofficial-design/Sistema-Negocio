@@ -265,12 +265,12 @@ export default function ProductosModule() {
       let createdProduct = null;
       if (modal.edit) {
         await dbUpdateProduct(modal.edit.id, payload)
-        await dbLogActivity(tenantId, userInfo?.id, 'update', 'product', modal.edit.id, { name: form.name })
+        await dbLogActivity(tenantId, userInfo?.id, 'update', 'product', modal.edit.id, { name: form.name, barcode: form.barcode, price: form.price })
         toast('Producto actualizado', 'success')
         createdProduct = { ...modal.edit, ...payload }
       } else {
         const created = await dbCreateProduct(payload)
-        await dbLogActivity(tenantId, userInfo?.id, 'create', 'product', created.id, { name: form.name })
+        await dbLogActivity(tenantId, userInfo?.id, 'create', 'product', created.id, { name: form.name, barcode: form.barcode, price: form.price })
         toast('Producto creado', 'success')
         createdProduct = { ...payload, id: created.id }
       }
@@ -305,7 +305,7 @@ export default function ProductosModule() {
     if (!confirm(`¿Desactivar "${product.name}"?`)) return
     try {
       await dbDeleteProduct(product.id)
-      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'product', product.id, { name: product.name })
+      await dbLogActivity(tenantId, userInfo?.id, 'delete', 'product', product.id, { name: product.name, barcode: product.barcode })
       toast('Producto desactivado', 'success')
       load()
     } catch (err) {

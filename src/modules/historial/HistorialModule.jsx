@@ -35,6 +35,49 @@ const ENTITY_LABELS = {
   tenant: 'Configuración'
 }
 
+function formatMoney(n) {
+  if (!n) return '$0'
+  return `$${Number(n).toLocaleString('es-AR')}`
+}
+
+function renderDetails(details) {
+  if (!details || Object.keys(details).length === 0) return '—'
+  
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {Object.entries(details).map(([k, v]) => {
+        // Translation and formatting for common keys
+        let keyLabel = k
+        let valStr = String(v)
+        
+        if (k === 'name' || k === 'product') keyLabel = 'Nombre'
+        if (k === 'barcode') keyLabel = 'Cód. Barras'
+        if (k === 'price' || k === 'unit_price') { keyLabel = 'Precio'; valStr = formatMoney(v) }
+        if (k === 'amount' || k === 'total') { keyLabel = 'Monto'; valStr = formatMoney(v) }
+        if (k === 'quantity' || k === 'qty') keyLabel = 'Cantidad'
+        if (k === 'stock') keyLabel = 'Stock Actual'
+        if (k === 'added') keyLabel = 'Stock Agregado'
+        if (k === 'reason') keyLabel = 'Motivo'
+        if (k === 'role') keyLabel = 'Rol'
+        if (k === 'action') keyLabel = 'Operación'
+        if (k === 'status') keyLabel = 'Estado'
+        if (k === 'items') keyLabel = 'Cant. Items'
+        if (k === 'category_id') keyLabel = 'Categoría ID'
+
+        // Skip printing raw objects if they somehow get in
+        if (typeof v === 'object') return null
+        
+        return (
+          <div key={k} style={{ display: 'flex', gap: '6px', alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{keyLabel}:</span>
+            <span style={{ color: 'var(--text-primary)' }}>{valStr}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function HistorialModule() {
   const { tenantId } = useApp()
   const [logs, setLogs] = useState([])
@@ -187,11 +230,7 @@ export default function HistorialModule() {
                         {log.entity_id || '—'}
                       </td>
                       <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {log.details ? (
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.72rem' }}>
-                            {Object.entries(log.details || {}).map(([k, v]) => `${k}: ${v}`).join(' · ')}
-                          </span>
-                        ) : '—'}
+                        {renderDetails(log.details)}
                       </td>
                     </tr>
                   )
