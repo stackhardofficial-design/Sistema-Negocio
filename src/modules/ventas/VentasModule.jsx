@@ -34,6 +34,12 @@ export default function VentasModule() {
 
   const [barcodeInput, setBarcodeInput] = useState('')
   const [quantity, setQuantity] = useState(1)
+  const quantityRef = useRef(quantity)
+
+  useEffect(() => {
+    quantityRef.current = quantity
+  }, [quantity])
+
   const [loading, setLoading] = useState(false)
   const [flashSuccess, setFlashSuccess] = useState(false)
 
@@ -44,7 +50,7 @@ export default function VentasModule() {
   const handleScan = useCallback(async (code) => {
     if (!code?.trim() || !tenantId || loading) return
     const trimmed = code.trim()
-    const qty = Math.max(1, quantity)
+    const qty = Math.max(1, quantityRef.current)
     setLoading(true)
     try {
       const product = await dbGetProductByBarcode(tenantId, trimmed)
@@ -77,7 +83,7 @@ export default function VentasModule() {
     } finally {
       setLoading(false)
     }
-  }, [tenantId, userInfo, quantity, loading])
+  }, [tenantId, userInfo, loading])
 
   function handleBarcodeSubmit(e) {
     e.preventDefault()
