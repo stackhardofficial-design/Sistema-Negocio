@@ -280,7 +280,8 @@ export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCo
 
   // Discount stock
   for (const item of items) {
-    await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: item.quantity })
+    const { error: rpcErr } = await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: item.quantity })
+    if (rpcErr) console.error('Error decrementing stock:', rpcErr)
   }
 
   return sale
@@ -302,7 +303,8 @@ export async function dbCancelSale(saleId, userId, reason) {
   if (items && items.length > 0) {
     for (const item of items) {
       if (item.product_id) {
-        await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+        const { error: rpcErr } = await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+        if (rpcErr) console.error('Error restoring stock:', rpcErr)
       }
     }
   }
@@ -340,7 +342,8 @@ export async function dbUpdateSaleItem(saleItemId, newQuantity) {
 
   // Ajustar stock (si diff > 0 = más items, descontar más; si < 0 = devolver stock)
   if (diff !== 0 && item.product_id) {
-    await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: diff })
+    const { error: rpcErr } = await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: diff })
+    if (rpcErr) console.error('Error updating stock:', rpcErr)
   }
 }
 
@@ -366,8 +369,9 @@ export async function dbDeleteSaleItem(saleItemId) {
     .eq('id', item.sale_id)
 
   // Restaurar stock (cantidad negativa → la función SQL suma de vuelta)
-  if (item.product_id && item.quantity > 0) {
-    await sb.rpc('increment_stock', { p_product_id: item.product_id, p_qty: item.quantity })
+  if (item.product_id) {
+    const { error: rpcErr } = await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+    if (rpcErr) console.error('Error restoring stock:', rpcErr)
   }
 }
 
