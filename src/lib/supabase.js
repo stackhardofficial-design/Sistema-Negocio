@@ -652,7 +652,7 @@ export async function dbGetExpenses(tenantId, opts = {}) {
   let q = sb.from('expenses')
     .select('*, expense_categories(name, icon), users(name)')
     .eq('tenant_id', tenantId)
-    .eq('is_active', true)
+    .or('is_active.eq.true,is_active.is.null')
 
   if (opts.dateFrom) q = q.gte('expense_date', opts.dateFrom)
   if (opts.dateTo) q = q.lte('expense_date', opts.dateTo)
@@ -667,7 +667,7 @@ export async function dbGetExpenses(tenantId, opts = {}) {
 }
 
 export async function dbCreateExpense(payload) {
-  const { data, error } = await sb.from('expenses').insert(payload).select().single()
+  const { data, error } = await sb.from('expenses').insert({ ...payload, is_active: true }).select().single()
   if (error) throw error
   return data
 }
