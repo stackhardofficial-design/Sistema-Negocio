@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'logo.png'],
+      includeAssets: ['favicon.png', 'logo.png'],
       manifest: {
         name: 'StackHard Sistema Negocio',
         short_name: 'Sistema Negocio',
