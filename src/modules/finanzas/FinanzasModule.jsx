@@ -3,7 +3,7 @@ import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetExpenseCategories, dbCreateExpenseCategory, dbUpdateExpenseCategory, dbDeleteExpenseCategory,
   dbGetExpenses, dbCreateExpense, dbDeleteExpense,
-  dbGetSaleSummary
+  dbGetSaleSummary, dbGetProducts
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -26,6 +26,7 @@ export default function FinanzasModule() {
   const [categories, setCategories] = useState([])
   const [expenses, setExpenses] = useState([])
   const [salesSummary, setSalesSummary] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Filtros
@@ -62,6 +63,10 @@ export default function FinanzasModule() {
       // Se pasa 23:59:59 al dateTo para incluir todo el día
       const sales = await dbGetSaleSummary(tenantId, dateFrom + 'T00:00:00Z', dateTo + 'T23:59:59Z')
       setSalesSummary(sales)
+
+      // Obtener productos para resolver códigos de barras antiguos
+      const prods = await dbGetProducts(tenantId)
+      setProducts(prods)
     } catch (err) {
       toast(`Error cargando finanzas: ${err.message}`, 'danger')
     } finally {
@@ -214,13 +219,16 @@ export default function FinanzasModule() {
         const normalizedStr = unitCostStr.replace(/\./g, '').replace(',', '.')
         const unit_cost = parseFloat(normalizedStr) || 0
 
+        const productMatch = products.find(p => p.name === name)
+        const barcode = productMatch ? (productMatch.barcode || '') : ''
+
         return {
           isProduct: true,
           data: {
             _type: 'stock_restock',
             qty,
             name,
-            barcode: '',
+            barcode,
             unit_cost
           }
         }
