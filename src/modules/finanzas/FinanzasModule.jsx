@@ -9,7 +9,7 @@ import Modal from '../../components/Modal'
 import { 
   TrendingUp, TrendingDown, DollarSign, Calendar,
   Plus, List, Trash2, Edit2, LayoutGrid, Search, AlertCircle
-, Lock } from 'lucide-react'
+, Lock, RefreshCw } from 'lucide-react'
 
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
