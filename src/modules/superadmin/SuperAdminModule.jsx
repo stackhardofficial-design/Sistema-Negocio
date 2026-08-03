@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant, dbCreateUserForTenant, dbDeleteTenantCascade, sb } from '../../lib/supabase'
+import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant, dbCreateUserForTenant, dbDeleteTenantCascade, dbUpdateUserPassword, sb } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { Crown, Plus, Building2, Users, Edit2, Search, ToggleLeft, Trash2 } from 'lucide-react'
 
@@ -52,11 +52,13 @@ export default function SuperAdminModule() {
     let createdTenantId = null
     try {
       if (modal.edit) {
-        await dbUpdateTenant(modal.edit.id, {
-          name: form.name.trim(),
-          plan: form.plan
-        })
-        toast('Negocio actualizado', 'success')
+        if (form.admin_password && form.admin_id) {
+          if (form.admin_password.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'warning')
+          await dbUpdateUserPassword(form.admin_id, form.admin_password)
+          toast('Contraseña actualizada', 'success')
+        } else if (!form.admin_password) {
+          toast('No se realizaron cambios', 'info')
+        }
       } else {
         // Validar contraseña mínima si se va a crear usuario
         if (form.admin_email && form.admin_password && form.admin_password.length < 6) {
@@ -111,9 +113,23 @@ export default function SuperAdminModule() {
   }
 
 
-  function openEdit(t) {
-    setForm({ name: t.name, admin_email: '', admin_password: '', admin_name: '', plan: t.plan || 'basic' })
+  async function openEdit(t) {
+    // Show a loading state or just set the base info first
+    setForm({ name: t.name, admin_email: 'Cargando...', admin_password: '', admin_name: 'Cargando...', plan: t.plan || 'basic', admin_id: null })
     setModal({ open: true, edit: t })
+
+    // Fetch the admin user for this tenant
+    const { data: users } = await sb.from('users').select('id, name, email, role').eq('tenant_id', t.id)
+    const adminUser = users?.find(u => u.role === 'admin') || users?.[0]
+
+    setForm({ 
+      name: t.name, 
+      admin_email: adminUser?.email || 'No encontrado', 
+      admin_password: '', 
+      admin_name: adminUser?.name || 'No encontrado', 
+      plan: t.plan || 'basic',
+      admin_id: adminUser?.id || null
+    })
   }
 
   function openDelete(t) {
@@ -243,47 +259,55 @@ export default function SuperAdminModule() {
             value={form.name}
             onChange={e => handleNameChange(e.target.value)}
             placeholder="Ej: Buffet San Martín"
-            autoFocus
+            autoFocus={!modal.edit}
+            disabled={!!modal.edit}
           />
-          <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-            El slug y el email del admin se generan automáticamente
-          </small>
+          {!modal.edit && (
+            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+              El slug y el email del admin se generan automáticamente
+            </small>
+          )}
         </div>
 
-        {!modal.edit && (
-          <>
-            <div className="form-group">
-              <label className="form-label">Nombre del admin</label>
-              <input
-                value={form.admin_name}
-                onChange={e => setForm(f => ({ ...f, admin_name: e.target.value }))}
-                placeholder="Ej: María García"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email del admin</label>
-              <input
-                value={form.admin_email}
-                onChange={e => setForm(f => ({ ...f, admin_email: e.target.value }))}
-                placeholder="admin@nombrelugar.com"
-                style={{ background: form.admin_email.includes('@') ? 'var(--success-soft)' : undefined }}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Contraseña del admin</label>
-              <input
-                type="password"
-                value={form.admin_password}
-                onChange={e => setForm(f => ({ ...f, admin_password: e.target.value }))}
-                placeholder="Mínimo 8 caracteres"
-              />
-            </div>
-          </>
-        )}
+        <div className="form-group">
+          <label className="form-label">Nombre del admin</label>
+          <input
+            value={form.admin_name}
+            onChange={e => setForm(f => ({ ...f, admin_name: e.target.value }))}
+            placeholder="Ej: María García"
+            disabled={!!modal.edit}
+          />
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">Email del admin</label>
+          <input
+            value={form.admin_email}
+            onChange={e => setForm(f => ({ ...f, admin_email: e.target.value }))}
+            placeholder="admin@nombrelugar.com"
+            style={{ background: form.admin_email.includes('@') && !modal.edit ? 'var(--success-soft)' : undefined }}
+            disabled={!!modal.edit}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Contraseña del admin</label>
+          <input
+            type="password"
+            value={form.admin_password}
+            onChange={e => setForm(f => ({ ...f, admin_password: e.target.value }))}
+            placeholder={modal.edit ? "Escribí la nueva contraseña para cambiarla" : "Mínimo 8 caracteres"}
+            disabled={modal.edit && !form.admin_id && form.admin_email === 'Cargando...'}
+          />
+        </div>
 
         <div className="form-group">
           <label className="form-label">Plan</label>
-          <select value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}>
+          <select 
+            value={form.plan} 
+            onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}
+            disabled={!!modal.edit}
+          >
             <option value="basic">Básico</option>
             <option value="pro">Pro</option>
             <option value="enterprise">Enterprise</option>

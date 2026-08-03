@@ -30,9 +30,8 @@ BEGIN
     DELETE FROM public.buffet_products WHERE tenant_id = p_tenant_id;
     
     DELETE FROM public.products WHERE tenant_id = p_tenant_id;
-    DELETE FROM public.product_categories WHERE tenant_id = p_tenant_id;
+    DELETE FROM public.categories WHERE tenant_id = p_tenant_id;
     
-    -- La tabla public.users ya se borra en cascada cuando borramos auth.users? No necesariamente.
     DELETE FROM public.users WHERE tenant_id = p_tenant_id;
     
     -- Finalmente, borrar el tenant

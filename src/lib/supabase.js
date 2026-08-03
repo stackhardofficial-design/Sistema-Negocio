@@ -140,6 +140,11 @@ export async function dbUpdateUser(id, payload) {
   return data
 }
 
+export async function dbUpdateUserPassword(userId, newPassword) {
+  const { error } = await sb.rpc('update_user_password', { p_user_id: userId, p_new_password: newPassword })
+  if (error) throw error
+}
+
 export async function dbDeleteUser(id) {
   const { error } = await sb.from('users').update({ is_active: false }).eq('id', id)
   if (error) throw error
