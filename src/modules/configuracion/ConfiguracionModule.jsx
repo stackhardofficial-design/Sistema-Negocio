@@ -179,7 +179,7 @@ export default function ConfiguracionModule() {
         </div>
         <div className="form-group">
           <label className="form-label">Icono (emoji)</label>
-          <input value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} placeholder="Ej: 🥤" />
+          <input value={catForm.icon} onChange={e => setCatForm(f => ({ ...f, icon: e.target.value }))} placeholder="Ej: fa-coffee" />
         </div>
       </Modal>
     </div>

@@ -7,7 +7,7 @@ import {
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X } from 'lucide-react'
+import {  Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X , ClipboardList, Utensils, Package as PkgIcon, User } from 'lucide-react'
 
 function formatMoney(n) { return `$${Number(n || 0).toLocaleString('es-AR')}` }
 function formatTime(d) { return new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }
@@ -269,7 +269,7 @@ export default function BuffetModule() {
         <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
           {[
             { id: 'pedidos', label: `📋 Pedidos ${activeOrders.length > 0 ? `(${activeOrders.length})` : ''}` },
-            { id: 'productos', label: '🍔 Productos Preparados' },
+            { id: 'productos', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><Utensils size={16}/> Productos Preparados</span> },
             { id: 'ingredientes', label: '🥗 Ingredientes (Stock)' }
           ].map(t => (
             <button
@@ -390,7 +390,7 @@ export default function BuffetModule() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <div>
                       <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {order.customer_name ? `👤 ${order.customer_name}` : 'Pedido'}
+                        {order.customer_name ? <span style={{display:'flex', alignItems:'center', gap:'4px'}}><User size={14}/> {order.customer_name}</span> : 'Pedido'}
                         <span className={`badge ${st.badge}`}>{st.label}</span>
                       </div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -406,7 +406,7 @@ export default function BuffetModule() {
                       )}
                       {order.status === 'preparing' && (
                         <button onClick={() => changeOrderStatus(order.id, 'ready')} className="btn btn-success btn-sm">
-                          ✓ Listo
+                          Listo
                         </button>
                       )}
                       {order.status === 'ready' && (

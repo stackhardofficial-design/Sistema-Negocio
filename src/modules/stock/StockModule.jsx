@@ -108,7 +108,7 @@ export default function StockModule() {
           expense_date: new Date().toISOString().split('T')[0],
           expense_type: 'variable'
         })
-        toast(`Gasto de ${formatMoney(cost)} registrado en Caja ✓`, 'success')
+        toast(`Gasto de ${formatMoney(cost)} registrado en Caja `, 'success')
       }
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
@@ -175,8 +175,8 @@ export default function StockModule() {
           <div style={{ display: 'flex', gap: '4px' }}>
             {[
               { id: 'all', label: 'Todos' },
-              { id: 'low', label: `⚠ Bajo (${lowCount})` },
-              { id: 'out', label: `❌ Sin stock (${outCount})` }
+              { id: 'low', label: <span style={{display:'flex', alignItems:'center', gap:'4px'}}><AlertTriangle size={14}/> Bajo (${lowCount})</span> },
+              { id: 'out', label: ` Sin stock (${outCount})` }
             ].map(v => (
               <button
                 key={v.id}
@@ -245,7 +245,7 @@ export default function StockModule() {
                       <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{p.min_stock ?? '—'}</td>
                       <td>
                         {isOut ? <span className="badge badge-danger">Sin stock</span>
-                          : isLow ? <span className="badge badge-warning">⚠ Bajo</span>
+                          : isLow ? <span className="badge badge-warning" style={{display:'flex', alignItems:'center', gap:'4px'}}><AlertTriangle size={12}/> Bajo</span>
                           : p.stock === null ? <span className="badge badge-neutral">Ilimitado</span>
                           : <span className="badge badge-success">OK</span>}
                       </td>
@@ -327,7 +327,7 @@ export default function StockModule() {
               disabled={savingExpense}
               className="btn btn-primary"
             >
-              {savingExpense ? 'Guardando...' : `✓ Sí, registrar ${expenseConfirmModal.added > 0 ? 'gasto' : 'ajuste'}${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
+              {savingExpense ? 'Guardando...' : ` Sí, registrar ${expenseConfirmModal.added > 0 ? 'gasto' : 'ajuste'}${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
             </button>
             <button
               onClick={() => handleConfirmExpense(false)}

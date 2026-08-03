@@ -8,7 +8,7 @@ export default function AIAgent() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `¡Hola! Soy tu asistente de IA 🤖\n\nPuedo ayudarte a navegar el sistema, consultar ventas, productos y más.\n\n¿En qué te ayudo?`
+      content: `¡Hola! Soy tu asistente de IA \n\nPuedo ayudarte a navegar el sistema, consultar ventas, productos y más.\n\n¿En qué te ayudo?`
     }
   ])
   const [input, setInput] = useState('')
@@ -49,7 +49,7 @@ export default function AIAgent() {
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `❌ Error: ${err.message}`
+        content: `Error: Error: ${err.message}`
       }])
     } finally {
       setLoading(false)

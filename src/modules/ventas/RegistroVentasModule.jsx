@@ -455,7 +455,7 @@ export default function RegistroVentasModule() {
               Cancelar
             </button>
             <button onClick={saveEdit} className="btn btn-primary" disabled={savingEdit}>
-              {savingEdit ? '⏳ Guardando...' : <><Save size={14} /> Guardar cambios</>}
+              {savingEdit ? 'Guardando...' : <><Save size={14} /> Guardar cambios</>}
             </button>
           </>
         }

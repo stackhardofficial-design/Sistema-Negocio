@@ -5,10 +5,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
-import {
+import { 
   TrendingUp, ShoppingCart, Package, AlertTriangle,
   DollarSign, Percent, LayoutDashboard, RefreshCw
-} from 'lucide-react'
+, BarChart2 } from 'lucide-react'
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const PIE_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899']
@@ -239,28 +239,7 @@ export default function DashboardModule() {
             <option value="week">Última semana</option>
             <option value="month">Último mes</option>
             <option value="6months">Últimos 6 meses</option>
-            <option value="custom">Personalizado</option>
           </select>
-          
-          {timeFilter === 'custom' && (
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <input 
-                type="date" 
-                className="input" 
-                style={{ padding: '4px 8px', fontSize: '0.85rem' }}
-                value={customFrom} 
-                onChange={e => setCustomFrom(e.target.value)} 
-              />
-              <span style={{ color: 'var(--text-muted)' }}>-</span>
-              <input 
-                type="date" 
-                className="input" 
-                style={{ padding: '4px 8px', fontSize: '0.85rem' }}
-                value={customTo} 
-                onChange={e => setCustomTo(e.target.value)} 
-              />
-            </div>
-          )}
 
           <button
             onClick={load}
@@ -327,11 +306,10 @@ export default function DashboardModule() {
           {/* Bar Chart - Ventas */}
           <div className="card">
             <h3 style={{ marginBottom: '20px', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
-              📊 Ventas vs Ganancia ({
+              Ventas vs Ganancia ({
                 timeFilter === '6months' ? 'últimos 6 meses' :
                 timeFilter === 'today' ? 'hoy' :
-                timeFilter === 'week' ? 'última semana' :
-                timeFilter === 'month' ? 'último mes' : 'personalizado'
+                timeFilter === 'week' ? 'última semana' : 'último mes'
               })
             </h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -350,7 +328,7 @@ export default function DashboardModule() {
           {/* Pie Chart - Categorías */}
           <div className="card">
             <h3 style={{ marginBottom: '20px', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
-              🥧 Categorías más vendidas
+              Categorías más vendidas
             </h3>
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>

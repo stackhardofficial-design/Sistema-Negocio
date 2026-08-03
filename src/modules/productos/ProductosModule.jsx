@@ -7,7 +7,7 @@ import {
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
-import { Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag } from 'lucide-react'
+import {  Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag , AlertTriangle } from 'lucide-react'
 
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
@@ -141,7 +141,7 @@ export default function ProductosModule() {
           expense_date: new Date().toISOString().split('T')[0],
           expense_type: 'variable'
         })
-        toast(`Gasto de ${formatMoney(cost)} registrado en Caja ✓`, 'success')
+        toast(`Gasto de ${formatMoney(cost)} registrado en Caja `, 'success')
       }
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
@@ -157,7 +157,7 @@ export default function ProductosModule() {
     try {
       const result = await dbCreateCategory(tenantId, catModal.name.trim())
       console.log('Category created:', result)
-      toast('Categoría creada ✓', 'success')
+      toast('Categoría creada ', 'success')
       setCatModal({ open: false, name: '' })
       load()
     } catch (err) {
@@ -445,7 +445,7 @@ export default function ProductosModule() {
                       <td style={{ textAlign: 'right' }}>
                         <span style={{ color: isLowStock ? 'var(--danger)' : 'var(--text-primary)', fontWeight: isLowStock ? 700 : 400 }}>
                           {p.stock ?? '∞'}
-                          {isLowStock && ' ⚠'}
+                          {isLowStock && <AlertTriangle size={14} style={{marginLeft: 6, color:'var(--warning)'}}/>}
                         </span>
                       </td>
                       <td>
@@ -731,7 +731,7 @@ export default function ProductosModule() {
               disabled={savingExpense}
               className="btn btn-primary"
             >
-              {savingExpense ? 'Guardando...' : `✓ Sí, registrar ${expenseConfirmModal.added > 0 ? 'gasto' : 'ajuste'}${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
+              {savingExpense ? 'Guardando...' : ` Sí, registrar ${expenseConfirmModal.added > 0 ? 'gasto' : 'ajuste'}${expenseConfirmModal.cost ? ` de ${formatMoney(expenseConfirmModal.cost)}` : ''}`}
             </button>
             <button
               onClick={() => handleConfirmExpense(false)}

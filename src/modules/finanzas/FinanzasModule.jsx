@@ -6,10 +6,10 @@ import {
   dbGetSaleSummary, dbGetProducts, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import {
+import { 
   TrendingUp, TrendingDown, DollarSign, Calendar,
   Plus, List, Trash2, Edit2, LayoutGrid, Search, AlertCircle
-} from 'lucide-react'
+, Lock } from 'lucide-react'
 
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
@@ -313,10 +313,10 @@ export default function FinanzasModule() {
                     <div className="kpi-value">{formatMoney(totalGastos)}</div>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>
-                        🔒 Fijos: {formatMoney(totalFijos)}
+                        <Lock size={14} style={{display:'inline', verticalAlign:'middle'}}/> Fijos: {formatMoney(totalFijos)}
                       </span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>
-                        🔄 Variables: {formatMoney(totalVariables)}
+                        <RefreshCw size={14} style={{display:'inline', verticalAlign:'middle'}}/> Variables: {formatMoney(totalVariables)}
                       </span>
                     </div>
                   </div>
@@ -617,7 +617,7 @@ export default function FinanzasModule() {
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             <button onClick={handleSaveExpense} disabled={saving || categories.length === 0} className="btn btn-primary" style={{ flex: 1 }}>
-              {saving ? 'Guardando...' : `Guardar Gasto ${expenseForm.expense_type === 'fixed' ? '🔒 Fijo' : '🔄 Variable'}`}
+              {saving ? 'Guardando...' : `Guardar Gasto`}
             </button>
             <button onClick={() => setExpenseModal({ open: false, edit: null })} disabled={saving} className="btn btn-secondary">
               Cancelar

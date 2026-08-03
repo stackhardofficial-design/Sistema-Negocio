@@ -73,7 +73,7 @@ export default function VentasModule() {
       setFlashSuccess(true)
       setTimeout(() => setFlashSuccess(false), 300)
       
-      toast(`✅ ${qty}x ${product.name} registrados: ${formatMoney(total)}`, 'success')
+      toast(`${qty}x ${product.name} registrados: ${formatMoney(total)}`, 'success')
       
       setQuantity(1)
       setBarcodeInput('')
