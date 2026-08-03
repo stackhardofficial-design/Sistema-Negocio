@@ -23,21 +23,60 @@ export default function DashboardModule() {
   const [sales, setSales] = useState([])
   const [products, setProducts] = useState([])
   const [refreshing, setRefreshing] = useState(false)
+  
+  // Filtros de tiempo
+  const [timeFilter, setTimeFilter] = useState('6months') // today, week, month, 6months, custom
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
   async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
     if (showLoading) setRefreshing(true)
+
+    // Calculamos la fecha desde según el filtro para la base de datos
     const now = new Date()
-    const from = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString()
-    const [s, p] = await Promise.all([
-      dbGetSales(tenantId, { dateFrom: from, status: 'completed' }),
-      dbGetProducts(tenantId)
-    ])
-    setSales(s)
-    setProducts(p)
-    if (showLoading) {
-      setLoading(false)
-      setRefreshing(false)
+    let fromDate = new Date()
+    let toDate = new Date()
+    
+    if (timeFilter === 'today') {
+      fromDate.setHours(0, 0, 0, 0)
+    } else if (timeFilter === 'week') {
+      fromDate.setDate(now.getDate() - 7)
+    } else if (timeFilter === 'month') {
+      fromDate.setMonth(now.getMonth() - 1)
+    } else if (timeFilter === '6months') {
+      fromDate.setMonth(now.getMonth() - 5)
+      fromDate.setDate(1)
+      fromDate.setHours(0, 0, 0, 0)
+    } else if (timeFilter === 'custom') {
+      fromDate = customFrom ? new Date(customFrom) : new Date(0)
+      toDate = customTo ? new Date(customTo) : new Date()
+      toDate.setHours(23, 59, 59, 999)
+    }
+
+    // Asegurarnos de traer SIEMPRE los datos de hoy para las tarjetas de KPIs principales
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const fetchFrom = fromDate < today ? fromDate : today
+
+    try {
+      const [s, p] = await Promise.all([
+        dbGetSales(tenantId, { 
+          dateFrom: fetchFrom.toISOString(), 
+          dateTo: (timeFilter === 'custom' && customTo) ? toDate.toISOString() : undefined,
+          status: 'completed' 
+        }),
+        dbGetProducts(tenantId)
+      ])
+      setSales(s)
+      setProducts(p)
+    } catch (err) {
+      console.error('Error cargando dashboard', err)
+    } finally {
+      if (showLoading) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }
 
@@ -51,7 +90,7 @@ export default function DashboardModule() {
       .subscribe()
 
     return () => { sb.removeChannel(channel) }
-  }, [tenantId])
+  }, [tenantId, timeFilter, customFrom, customTo])
 
   // ===== Computar KPIs =====
   const today = new Date()
@@ -63,24 +102,91 @@ export default function DashboardModule() {
   const totalTransacciones = todaySales.length
   const lowStockProducts = products.filter(p => p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock)
 
-  // ===== Ventas mensuales (últimos 6 meses) =====
-  const monthlyData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(today.getFullYear(), today.getMonth() - (5 - i), 1)
-    const nextD = new Date(today.getFullYear(), today.getMonth() - (5 - i) + 1, 1)
-    const monthSales = sales.filter(s => {
-      const sd = new Date(s.created_at)
-      return sd >= d && sd < nextD && s.status === 'completed'
+  // ===== Filtrar ventas según el rango elegido (para los gráficos) =====
+  let filteredSales = sales
+  let fromDate = new Date()
+  if (timeFilter === 'today') {
+    fromDate.setHours(0, 0, 0, 0)
+    filteredSales = sales.filter(s => new Date(s.created_at) >= fromDate)
+  } else if (timeFilter === 'week') {
+    fromDate.setDate(today.getDate() - 7)
+    filteredSales = sales.filter(s => new Date(s.created_at) >= fromDate)
+  } else if (timeFilter === 'month') {
+    fromDate.setMonth(today.getMonth() - 1)
+    filteredSales = sales.filter(s => new Date(s.created_at) >= fromDate)
+  } else if (timeFilter === '6months') {
+    fromDate.setMonth(today.getMonth() - 5)
+    fromDate.setDate(1)
+    fromDate.setHours(0, 0, 0, 0)
+    filteredSales = sales.filter(s => new Date(s.created_at) >= fromDate)
+  } else if (timeFilter === 'custom') {
+    const cf = customFrom ? new Date(customFrom) : new Date(0)
+    const ct = customTo ? new Date(customTo) : new Date()
+    ct.setHours(23, 59, 59, 999)
+    fromDate = cf
+    filteredSales = sales.filter(s => {
+      const d = new Date(s.created_at)
+      return d >= cf && d <= ct
     })
-    return {
-      mes: MONTHS[d.getMonth()],
-      ventas: monthSales.reduce((a, s) => a + (s.total_amount || 0), 0),
-      ganancia: monthSales.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0)
-    }
-  })
+  }
 
-  // ===== Categorías (pie chart) =====
+  // ===== Generar datos para el gráfico de barras =====
+  // Si es semestral, agrupamos por mes. Sino, por días.
+  let chartData = []
+  if (timeFilter === '6months') {
+    chartData = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(today.getFullYear(), today.getMonth() - (5 - i), 1)
+      const nextD = new Date(today.getFullYear(), today.getMonth() - (5 - i) + 1, 1)
+      const monthSales = filteredSales.filter(s => {
+        const sd = new Date(s.created_at)
+        return sd >= d && sd < nextD
+      })
+      return {
+        label: MONTHS[d.getMonth()],
+        ventas: monthSales.reduce((a, s) => a + (s.total_amount || 0), 0),
+        ganancia: monthSales.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0)
+      }
+    })
+  } else {
+    // Agrupar por días
+    // Calcular días de diferencia
+    const diffTime = Math.abs(today - fromDate)
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const daysToIterate = timeFilter === 'today' ? 1 : (diffDays > 31 && timeFilter !== 'custom' ? 31 : diffDays)
+    
+    // Generar un array de días
+    const dailyMap = {}
+    filteredSales.forEach(s => {
+      const d = new Date(s.created_at)
+      const dayKey = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`
+      if (!dailyMap[dayKey]) dailyMap[dayKey] = { ventas: 0, ganancia: 0 }
+      dailyMap[dayKey].ventas += (s.total_amount || 0)
+      dailyMap[dayKey].ganancia += ((s.total_amount || 0) - (s.total_cost || 0))
+    })
+
+    // Llenar los días vacíos
+    let startD = new Date(fromDate)
+    let endD = timeFilter === 'custom' && customTo ? new Date(customTo) : new Date()
+    if (timeFilter === 'today') {
+      startD = new Date(today)
+      endD = new Date(today)
+    }
+    
+    let currentD = new Date(startD)
+    while (currentD <= endD) {
+      const dayKey = `${currentD.getDate().toString().padStart(2, '0')}/${(currentD.getMonth() + 1).toString().padStart(2, '0')}`
+      chartData.push({
+        label: dayKey,
+        ventas: dailyMap[dayKey]?.ventas || 0,
+        ganancia: dailyMap[dayKey]?.ganancia || 0
+      })
+      currentD.setDate(currentD.getDate() + 1)
+    }
+  }
+
+  // ===== Categorías (pie chart) filtradas =====
   const catMap = {}
-  sales.filter(s => s.status === 'completed').forEach(sale => {
+  filteredSales.forEach(sale => {
     (sale.sale_items || []).forEach(item => {
       const cat = item.products?.categories?.name || 'Sin categoría'
       catMap[cat] = (catMap[cat] || 0) + (item.quantity || 1)
@@ -122,14 +228,49 @@ export default function DashboardModule() {
           <span className="icon-wrap"><LayoutDashboard size={20} /></span>
           Dashboard
         </h1>
-        <button
-          onClick={load}
-          className="btn btn-secondary btn-sm"
-          disabled={refreshing}
-        >
-          <RefreshCw size={14} className={refreshing ? 'spinning' : ''} />
-          Actualizar
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <select 
+            className="input" 
+            value={timeFilter} 
+            onChange={e => setTimeFilter(e.target.value)}
+            style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+          >
+            <option value="today">Hoy</option>
+            <option value="week">Última semana</option>
+            <option value="month">Último mes</option>
+            <option value="6months">Últimos 6 meses</option>
+            <option value="custom">Personalizado</option>
+          </select>
+          
+          {timeFilter === 'custom' && (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <input 
+                type="date" 
+                className="input" 
+                style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                value={customFrom} 
+                onChange={e => setCustomFrom(e.target.value)} 
+              />
+              <span style={{ color: 'var(--text-muted)' }}>-</span>
+              <input 
+                type="date" 
+                className="input" 
+                style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                value={customTo} 
+                onChange={e => setCustomTo(e.target.value)} 
+              />
+            </div>
+          )}
+
+          <button
+            onClick={load}
+            className="btn btn-secondary btn-sm"
+            disabled={refreshing}
+          >
+            <RefreshCw size={14} className={refreshing ? 'spinning' : ''} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       <div className="module-content" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -183,15 +324,20 @@ export default function DashboardModule() {
 
         {/* Charts Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-          {/* Bar Chart - Ventas mensuales */}
+          {/* Bar Chart - Ventas */}
           <div className="card">
             <h3 style={{ marginBottom: '20px', fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
-              📊 Ventas vs Ganancia (últimos 6 meses)
+              📊 Ventas vs Ganancia ({
+                timeFilter === '6months' ? 'últimos 6 meses' :
+                timeFilter === 'today' ? 'hoy' :
+                timeFilter === 'week' ? 'última semana' :
+                timeFilter === 'month' ? 'último mes' : 'personalizado'
+              })
             </h3>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={monthlyData} barGap={4}>
+              <BarChart data={chartData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="mes" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false}
                   tickFormatter={v => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
                 <Tooltip content={<CustomTooltip />} />
