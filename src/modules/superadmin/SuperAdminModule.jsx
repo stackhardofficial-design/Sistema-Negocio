@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant, dbCreateUserForTenant, sb } from '../../lib/supabase'
+import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant, dbCreateUserForTenant, dbDeleteTenantCascade, sb } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Crown, Plus, Building2, Users, Edit2, Search, ToggleLeft } from 'lucide-react'
+import { Crown, Plus, Building2, Users, Edit2, Search, ToggleLeft, Trash2 } from 'lucide-react'
 
 function formatDate(d) { return new Date(d).toLocaleDateString('es-AR') }
 
@@ -14,8 +14,10 @@ export default function SuperAdminModule() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState({ open: false, edit: null })
+  const [deleteModal, setDeleteModal] = useState({ open: false, tenant: null, confirmName: '' })
   const [form, setForm] = useState(EMPTY_TENANT)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -114,6 +116,29 @@ export default function SuperAdminModule() {
     setModal({ open: true, edit: t })
   }
 
+  function openDelete(t) {
+    setDeleteModal({ open: true, tenant: t, confirmName: '' })
+  }
+
+  async function handleDelete() {
+    if (!deleteModal.tenant) return
+    if (deleteModal.confirmName !== deleteModal.tenant.name) {
+      return toast('El nombre no coincide', 'warning')
+    }
+    
+    setDeleting(true)
+    try {
+      await dbDeleteTenantCascade(deleteModal.tenant.id)
+      toast(`Negocio "${deleteModal.tenant.name}" y todos sus datos han sido eliminados`, 'success')
+      setDeleteModal({ open: false, tenant: null, confirmName: '' })
+      load()
+    } catch (err) {
+      toast(`Error al eliminar: ${err.message}`, 'danger')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const filtered = tenants.filter(t =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
     (t.slug || '').includes(search.toLowerCase())
@@ -184,9 +209,14 @@ export default function SuperAdminModule() {
                 <span className={`badge ${t.is_active ? 'badge-success' : 'badge-neutral'}`}>
                   {t.is_active ? 'Activo' : 'Inactivo'}
                 </span>
-                <button onClick={() => openEdit(t)} className="btn btn-secondary btn-sm">
-                  <Edit2 size={12} /> Editar
-                </button>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button onClick={() => openEdit(t)} className="btn btn-secondary btn-sm">
+                    <Edit2 size={12} /> Editar
+                  </button>
+                  <button onClick={() => openDelete(t)} className="btn btn-secondary btn-sm" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -258,6 +288,48 @@ export default function SuperAdminModule() {
             <option value="pro">Pro</option>
             <option value="enterprise">Enterprise</option>
           </select>
+        </div>
+      </Modal>
+
+      {/* Modal de Eliminar Negocio */}
+      <Modal
+        open={deleteModal.open}
+        onClose={() => setDeleteModal({ open: false, tenant: null, confirmName: '' })}
+        title="Eliminar Negocio Permanentemente"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setDeleteModal({ open: false, tenant: null, confirmName: '' })} className="btn btn-secondary">Cancelar</button>
+            <button 
+              onClick={handleDelete} 
+              className="btn btn-primary" 
+              style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+              disabled={deleting || deleteModal.confirmName !== deleteModal.tenant?.name}
+            >
+              {deleting ? 'Eliminando...' : 'Eliminar Negocio'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ padding: '16px', background: 'var(--danger-soft)', color: 'var(--danger)', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+          <strong>¡ADVERTENCIA!</strong> Esta acción es <strong>irreversible</strong>. Se eliminarán permanentemente:
+          <ul style={{ margin: '8px 0 0 20px', fontSize: '0.85rem' }}>
+            <li>Todos los productos y stock</li>
+            <li>El historial completo de ventas y gastos</li>
+            <li>Cuentas corrientes, deudores y pagos</li>
+            <li>Todos los usuarios y contraseñas de este negocio</li>
+          </ul>
+        </div>
+        
+        <div className="form-group">
+          <label className="form-label">
+            Para confirmar, escribe el nombre del negocio: <strong>{deleteModal.tenant?.name}</strong>
+          </label>
+          <input
+            value={deleteModal.confirmName}
+            onChange={e => setDeleteModal(m => ({ ...m, confirmName: e.target.value }))}
+            placeholder={deleteModal.tenant?.name}
+          />
         </div>
       </Modal>
     </div>

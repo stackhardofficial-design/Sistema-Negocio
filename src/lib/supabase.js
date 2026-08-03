@@ -73,6 +73,11 @@ export async function dbUpdateTenant(id, payload) {
   return data
 }
 
+export async function dbDeleteTenantCascade(tenantId) {
+  const { error } = await sb.rpc('delete_tenant_cascade', { p_tenant_id: tenantId })
+  if (error) throw error
+}
+
 // ===== USERS =====
 export async function dbGetUsers(tenantId) {
   const { data } = await sb.from('users').select('*')
