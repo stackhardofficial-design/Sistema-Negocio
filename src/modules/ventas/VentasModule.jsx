@@ -263,7 +263,10 @@ export default function VentasModule() {
 
       setQuantity(1)
       setBarcodeInput('')
-      // Mantener método de pago seleccionado para la siguiente venta
+      
+      // Limpiar método de pago para la siguiente venta (evita escaneos dobles accidentales)
+      setPaymentMethod(null)
+      setSelectedDebtor(null)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
       setBarcodeInput('')
