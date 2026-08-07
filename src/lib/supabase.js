@@ -178,13 +178,17 @@ export async function dbDeleteCategory(id) {
 // ===== PRODUCTS =====
 export async function dbGetProducts(tenantId, opts = {}) {
   let q = sb.from('products')
-    .select('*, categories(name, icon), product_components(*)')
+    .select('*, categories(name, icon), product_components!product_components_composite_product_id_fkey(*)')
     .eq('tenant_id', tenantId)
   if (!opts.includeInactive) q = q.eq('is_active', true)
   if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
   if (opts.search) q = q.ilike('name', `%${opts.search}%`)
   q = q.order('name')
-  const { data } = await q
+  const { data, error } = await q
+  if (error) {
+    console.error('Error fetching products:', error)
+    throw error
+  }
   return data || []
 }
 
