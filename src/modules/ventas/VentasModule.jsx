@@ -53,20 +53,24 @@ function IconEfectivo({ active }) {
 }
 
 function IconMercadoPago({ active }) {
-  // Logo inspirado en MercadoPago con colores del sistema (azul #3b82f6)
-  const c = active ? '#3b82f6' : '#6b7280'
-  const bg = active ? 'rgba(59,130,246,0.18)' : 'rgba(107,114,128,0.1)'
+  // Logo oficial Mercado Pago: círculo azul con 'mp' blanco
+  const blue = active ? '#009EE3' : '#6b7280'
   return (
-    <svg width="40" height="36" viewBox="0 0 40 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Fondo redondeado */}
-      <rect x="2" y="4" width="36" height="28" rx="8" fill={bg} stroke={c} strokeWidth="1.5"/>
-      {/* Letra M estilizada - estilo MercadoPago */}
-      <path d="M10 25 L10 14 L16 21 L22 14 L22 25" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      {/* Letra P estilizada */}
-      <path d="M25 25 L25 14" stroke={c} strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-      <path d="M25 14 C25 14 31 14 31 18.5 C31 23 25 23 25 23" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      {/* Punto acento azul */}
-      {active && <circle cx="34" cy="8" r="3" fill="#3b82f6"/>}
+    <svg width="42" height="36" viewBox="0 0 42 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Círculo principal - color oficial MP */}
+      <circle cx="21" cy="18" r="15" fill={blue} />
+      {/* Texto 'mp' en blanco - estilo oficial */}
+      <text
+        x="21" y="23"
+        textAnchor="middle"
+        fontSize="12"
+        fontWeight="800"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif"
+        fill="white"
+        letterSpacing="-0.5"
+      >mp</text>
+      {/* Punto decorativo oficial */}
+      {active && <circle cx="33" cy="7" r="3.5" fill="#009EE3" opacity="0.6" />}
     </svg>
   )
 }
@@ -110,10 +114,10 @@ const PAYMENT_METHODS = [
     label: 'Mercado Pago',
     sublabel: 'Transferencia',
     IconComponent: IconMercadoPago,
-    color: '#3b82f6',
-    colorSoft: 'rgba(59,130,246,0.12)',
-    colorBorder: 'rgba(59,130,246,0.45)',
-    colorGlow: 'rgba(59,130,246,0.25)',
+    color: '#009EE3',
+    colorSoft: 'rgba(0,158,227,0.12)',
+    colorBorder: 'rgba(0,158,227,0.45)',
+    colorGlow: 'rgba(0,158,227,0.25)',
   },
   {
     id: 'deudor',
@@ -437,87 +441,70 @@ export default function VentasModule() {
                   No hay deudores registrados. Creá uno desde el módulo Deudores.
                 </div>
               ) : (
-                <div style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => setDebtorDropdownOpen(v => !v)}
-                    style={{
-                      width: '100%', height: '48px', borderRadius: '12px',
-                      border: `2px solid ${selectedDebtor ? 'rgba(239,68,68,0.5)' : 'var(--border)'}`,
-                      background: selectedDebtor ? 'rgba(239,68,68,0.08)' : 'var(--bg)',
-                      color: selectedDebtor ? '#ef4444' : 'var(--text-muted)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '0 14px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600,
-                      transition: 'all 0.15s',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <User size={16} />
-                      {selectedDebtor ? selectedDebtor.name : 'Elegir deudor...'}
-                    </div>
-                    <ChevronDown size={16} style={{
-                      transition: 'transform 0.2s',
-                      transform: debtorDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'
-                    }} />
-                  </button>
-
-                  {debtorDropdownOpen && (
-                    <div className="fade-in" style={{
-                      position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                      zIndex: 100,
-                      maxHeight: '220px', overflowY: 'auto'
-                    }}>
-                      {debtors.map(d => (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedDebtor(d)
-                            setDebtorDropdownOpen(false)
-                            setTimeout(() => barcodeRef.current?.focus(), 100)
-                          }}
-                          style={{
-                            width: '100%', textAlign: 'left', padding: '12px 16px',
-                            background: selectedDebtor?.id === d.id ? 'rgba(239,68,68,0.1)' : 'transparent',
-                            border: 'none', cursor: 'pointer', display: 'flex',
-                            alignItems: 'center', justifyContent: 'space-between',
-                            borderBottom: '1px solid var(--border)',
-                            color: 'var(--text-primary)', fontSize: '0.88rem',
-                            transition: 'background 0.12s',
-                            WebkitTapHighlightColor: 'transparent'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-                          onMouseLeave={e => e.currentTarget.style.background = selectedDebtor?.id === d.id ? 'rgba(239,68,68,0.1)' : 'transparent'}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                              width: '28px', height: '28px', borderRadius: '50%',
-                              background: 'rgba(239,68,68,0.15)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: '#ef4444', fontWeight: 700, fontSize: '0.75rem', flexShrink: 0
-                            }}>
-                              {d.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{d.name}</div>
-                              {d.phone && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{d.phone}</div>}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <div style={{ fontSize: '0.78rem', color: '#ef4444', fontWeight: 700 }}>
-                              ${Number(d.total_debt || 0).toLocaleString('es-AR')}
-                            </div>
-                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>deuda actual</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                // Lista inline - sin dropdown absoluto para mejor compatibilidad móvil
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {debtors.map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onPointerDown={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setSelectedDebtor(d)
+                        setDebtorDropdownOpen(false)
+                      }}
+                      style={{
+                        width: '100%', textAlign: 'left',
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        background: selectedDebtor?.id === d.id
+                          ? 'rgba(245,158,11,0.15)'
+                          : 'var(--bg)',
+                        border: `2px solid ${
+                          selectedDebtor?.id === d.id
+                            ? 'rgba(245,158,11,0.5)'
+                            : 'var(--border)'
+                        }`,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.15s',
+                        WebkitTapHighlightColor: 'transparent',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '32px', height: '32px', borderRadius: '50%',
+                          background: selectedDebtor?.id === d.id
+                            ? 'rgba(245,158,11,0.2)'
+                            : 'rgba(107,114,128,0.1)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: selectedDebtor?.id === d.id ? '#f59e0b' : 'var(--text-muted)',
+                          fontWeight: 800, fontSize: '0.85rem', flexShrink: 0
+                        }}>
+                          {d.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{d.name}</div>
+                          {d.phone && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{d.phone}</div>}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{
+                          fontSize: '0.82rem',
+                          color: selectedDebtor?.id === d.id ? '#f59e0b' : '#ef4444',
+                          fontWeight: 700
+                        }}>
+                          ${Number(d.total_debt || 0).toLocaleString('es-AR')}
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>deuda</div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
 

@@ -652,8 +652,8 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
 function PaymentBadge({ method, debtorName }) {
   const map = {
     efectivo:      { label: '💵 Efectivo',       bg: 'rgba(16,185,129,0.12)',  color: '#10b981', border: 'rgba(16,185,129,0.35)' },
-    transferencia: { label: '📲 Transferencia',  bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6', border: 'rgba(59,130,246,0.35)' },
-    deudor:        { label: debtorName ? `📒 ${debtorName}` : '📒 Deudor', bg: 'rgba(239,68,68,0.10)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+    transferencia: { label: '📲 Mercado Pago',  bg: 'rgba(0,158,227,0.12)',   color: '#009EE3', border: 'rgba(0,158,227,0.35)' },
+    deudor:        { label: debtorName ? `📒 ${debtorName}` : '📒 Deudor', bg: 'rgba(245,158,11,0.10)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
   }
   const cfg = map[method] || { label: method || '—', bg: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: 'var(--border)' }
   return (
