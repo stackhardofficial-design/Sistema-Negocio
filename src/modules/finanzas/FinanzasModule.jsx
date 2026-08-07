@@ -82,6 +82,7 @@ export default function FinanzasModule() {
     const channel = sb.channel('finanzas_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_categories', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .subscribe()
     return () => { sb.removeChannel(channel) }
   }, [tenantId, dateFrom, dateTo])
