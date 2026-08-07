@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetSales, dbCancelSale, dbLogActivity,
@@ -34,14 +34,14 @@ export default function RegistroVentasModule() {
 
   // ===== FILTROS =====
   const [showFilters, setShowFilters] = useState(false)
-  const [filterDate, setFilterDate] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
   const [filterUser, setFilterUser] = useState('')
   const [filterSearch, setFilterSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('') // '' | 'completed' | 'cancelled'
   const [filterPayment, setFilterPayment] = useState('') // '' | 'efectivo' | 'transferencia' | 'deudor'
 
-  // ===== TOTALES =====
-  const [totals, setTotals] = useState({ sales: 0, profit: 0, count: 0 })
+  // Los totales se calculan dinámicamente más abajo con useMemo
 
   // ===== MODALS =====
   const [detailModal, setDetailModal] = useState({ open: false, sale: null })
@@ -65,31 +65,44 @@ export default function RegistroVentasModule() {
     setSales(data)
     if (showLoading) setLoadingSales(false)
 
-    const completed = data.filter(s => s.status === 'completed')
-    const autoconsumo = data.filter(s => s.status === 'autoconsumo')
-    setTotals({
-      sales: completed.reduce((a, s) => a + (s.total_amount || 0), 0),
-      profit: completed.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0) - autoconsumo.reduce((a, s) => a + (s.total_cost || 0), 0),
-      count: completed.length + autoconsumo.length
-    })
+    // Los totales ahora se calculan dinámicamente en base a filteredSales
   }
 
   // ===== FILTRADO =====
-  const filteredSales = sales.filter(s => {
-    if (filterStatus && s.status !== filterStatus) return false
-    if (filterPayment && s.payment_method !== filterPayment) return false
-    if (filterDate && !s.created_at.startsWith(filterDate)) return false
-    if (filterUser && !s.users?.name?.toLowerCase().includes(filterUser.toLowerCase())) return false
-    if (filterSearch) {
-      const q = filterSearch.toLowerCase()
-      const hasItem = (s.sale_items || []).some(i =>
-        i.products?.name?.toLowerCase().includes(q) ||
-        i.products?.barcode?.includes(q)
-      )
-      if (!hasItem && !s.id.toLowerCase().includes(q)) return false
+  const filteredSales = useMemo(() => {
+    return sales.filter(s => {
+      if (filterStatus && s.status !== filterStatus) return false
+      if (filterPayment && s.payment_method !== filterPayment) return false
+      
+      if (filterDateFrom || filterDateTo) {
+        const saleDate = new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+        if (filterDateFrom && saleDate < filterDateFrom) return false
+        if (filterDateTo && saleDate > filterDateTo) return false
+      }
+      
+      if (filterUser && !s.users?.name?.toLowerCase().includes(filterUser.toLowerCase())) return false
+      if (filterSearch) {
+        const q = filterSearch.toLowerCase()
+        const hasItem = (s.sale_items || []).some(i =>
+          i.products?.name?.toLowerCase().includes(q) ||
+          i.products?.barcode?.includes(q)
+        )
+        if (!hasItem && !s.id.toLowerCase().includes(q)) return false
+      }
+      return true
+    })
+  }, [sales, filterStatus, filterPayment, filterDateFrom, filterDateTo, filterUser, filterSearch])
+
+  // ===== TOTALES (Dinámicos según filtros) =====
+  const totals = useMemo(() => {
+    const completed = filteredSales.filter(s => s.status === 'completed')
+    const autoconsumo = filteredSales.filter(s => s.status === 'autoconsumo')
+    return {
+      sales: completed.reduce((a, s) => a + (s.total_amount || 0), 0),
+      profit: completed.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0) - autoconsumo.reduce((a, s) => a + (s.total_cost || 0), 0),
+      count: completed.length + autoconsumo.length
     }
-    return true
-  })
+  }, [filteredSales])
 
   // ===== ANULAR VENTA =====
   async function handleCancel() {
@@ -197,7 +210,7 @@ export default function RegistroVentasModule() {
     }
   }
 
-  const activeFilters = !!(filterDate || filterUser || filterSearch || filterStatus || filterPayment)
+  const activeFilters = !!(filterDateFrom || filterDateTo || filterUser || filterSearch || filterStatus || filterPayment)
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -250,8 +263,12 @@ export default function RegistroVentasModule() {
           display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end'
         }}>
           <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
-            <label className="form-label">Fecha</label>
-            <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
+            <label className="form-label">Desde</label>
+            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
+          </div>
+          <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
+            <label className="form-label">Hasta</label>
+            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
           </div>
           <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
             <label className="form-label">Vendedor</label>
@@ -280,7 +297,7 @@ export default function RegistroVentasModule() {
             </select>
           </div>
           <button
-            onClick={() => { setFilterDate(''); setFilterUser(''); setFilterSearch(''); setFilterStatus(''); setFilterPayment('') }}
+            onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterUser(''); setFilterSearch(''); setFilterStatus(''); setFilterPayment('') }}
             className="btn btn-secondary btn-sm"
           >
             <X size={14} /> Limpiar
