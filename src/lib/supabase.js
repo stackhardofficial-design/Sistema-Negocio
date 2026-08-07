@@ -178,7 +178,7 @@ export async function dbDeleteCategory(id) {
 // ===== PRODUCTS =====
 export async function dbGetProducts(tenantId, opts = {}) {
   let q = sb.from('products')
-    .select('*, categories(name, icon)')
+    .select('*, categories(name, icon), product_components(*)')
     .eq('tenant_id', tenantId)
   if (!opts.includeInactive) q = q.eq('is_active', true)
   if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
@@ -216,6 +216,18 @@ export async function dbUpdateProductStock(id, quantity) {
 
 export async function dbDeleteProduct(id) {
   const { error } = await sb.from('products').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}
+
+export async function dbSetProductComponents(compositeProductId, componentsList) {
+  await sb.from('product_components').delete().eq('composite_product_id', compositeProductId)
+  if (!componentsList || componentsList.length === 0) return
+  const rows = componentsList.map(c => ({
+    composite_product_id: compositeProductId,
+    component_product_id: c.component_product_id,
+    quantity: c.quantity
+  }))
+  const { error } = await sb.from('product_components').insert(rows)
   if (error) throw error
 }
 

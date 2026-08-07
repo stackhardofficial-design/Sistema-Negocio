@@ -3,7 +3,7 @@ import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetProducts, dbGetCategories, dbCreateProduct,
   dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity,
-  dbCreateCategory, dbDeleteCategory, dbCreateExpense, dbEnsureExpenseCategory
+  dbCreateCategory, dbDeleteCategory, dbCreateExpense, dbEnsureExpenseCategory, dbSetProductComponents
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
@@ -16,7 +16,8 @@ function formatMoney(n) {
 const EMPTY_PRODUCT = {
   name: '', barcode: '', category_id: '',
   price: '', cost_price: '', stock: '', min_stock: '',
-  description: '', is_active: true, register_initial_expense: false
+  description: '', is_active: true, register_initial_expense: false,
+  is_composite: false, components: []
 }
 
 function SearchableCategorySelect({ value, onChange, categories }) {
@@ -218,7 +219,12 @@ export default function ProductosModule() {
       stock: product.stock ?? '',
       min_stock: product.min_stock ?? '',
       description: product.description || '',
-      is_active: product.is_active ?? true
+      is_active: product.is_active ?? true,
+      is_composite: product.is_composite ?? false,
+      components: product.product_components ? product.product_components.map(c => ({
+        component_product_id: c.component_product_id,
+        quantity: c.quantity
+      })) : []
     })
     setModal({ open: true, edit: product })
   }
@@ -256,10 +262,11 @@ export default function ProductosModule() {
         category_id: form.category_id || null,
         price: parseFloat(form.price),
         cost_price: form.cost_price ? parseFloat(form.cost_price) : 0,
-        stock: form.stock !== '' ? parseInt(form.stock) : null,
-        min_stock: form.min_stock !== '' ? parseInt(form.min_stock) : null,
+        stock: form.is_composite ? null : (form.stock !== '' ? parseInt(form.stock) : null),
+        min_stock: form.is_composite ? null : (form.min_stock !== '' ? parseInt(form.min_stock) : null),
         description: form.description || null,
-        is_active: form.is_active
+        is_active: form.is_active,
+        is_composite: form.is_composite
       }
 
       let createdProduct = null;
@@ -275,11 +282,21 @@ export default function ProductosModule() {
         createdProduct = { ...payload, id: created.id }
       }
 
+      if (form.is_composite) {
+        await dbSetProductComponents(createdProduct.id, form.components)
+        const totalCost = form.components.reduce((acc, c) => {
+          const p = products.find(prod => prod.id === c.component_product_id)
+          return acc + (p ? parseFloat(p.cost_price || 0) * c.quantity : 0)
+        }, 0)
+        await dbUpdateProduct(createdProduct.id, { cost_price: totalCost })
+        createdProduct.cost_price = totalCost
+      }
+
       const oldStock = modal.edit && modal.edit.stock !== null && modal.edit.stock !== undefined ? modal.edit.stock : 0;
-      const newStock = form.stock !== '' ? parseInt(form.stock) : 0;
+      const newStock = !form.is_composite && form.stock !== '' ? parseInt(form.stock) : 0;
       const added = newStock - oldStock;
 
-      if (added !== 0) {
+      if (!form.is_composite && added !== 0) {
         const suggestedCost = form.cost_price ? (form.cost_price * added) : ''
         setModal({ open: false, edit: null })
         setExpenseConfirmModal({
@@ -323,17 +340,48 @@ export default function ProductosModule() {
   })
 
   const margin = (p) => {
-    if (!p.price || !p.cost_price || p.cost_price === 0) return null
-    return (((p.price - p.cost_price) / p.price) * 100).toFixed(1)
+    const cost = getDisplayCost(p)
+    if (!p.price || !cost || cost === 0) return null
+    return (((p.price - cost) / p.price) * 100).toFixed(1)
+  }
+
+  const getDisplayCost = (p) => {
+    if (p.is_composite) {
+      return p.product_components?.reduce((acc, c) => {
+        const compProd = products.find(prod => prod.id === c.component_product_id)
+        return acc + (compProd ? parseFloat(compProd.cost_price || 0) * c.quantity : 0)
+      }, 0) || 0
+    }
+    return p.cost_price || 0
+  }
+
+  const getDisplayStock = (p) => {
+    if (p.is_composite) {
+      if (!p.product_components || p.product_components.length === 0) return 0
+      let minStock = Infinity
+      for (let c of p.product_components) {
+        const compProd = products.find(prod => prod.id === c.component_product_id)
+        if (compProd) {
+          const s = Math.floor((compProd.stock || 0) / c.quantity)
+          if (s < minStock) minStock = s
+        } else {
+          minStock = 0
+        }
+      }
+      return minStock === Infinity ? 0 : minStock
+    }
+    return p.stock
   }
 
   const totalInvertido = products.reduce((acc, p) => {
+    if (p.is_composite) return acc // Evitar contar doble
     const cost = parseFloat(p.cost_price || 0)
     const stock = p.stock && p.stock > 0 ? p.stock : 0
     return acc + (cost * stock)
   }, 0)
 
   const gananciaEsperada = products.reduce((acc, p) => {
+    if (p.is_composite) return acc // Evitar contar doble
     const cost = parseFloat(p.cost_price || 0)
     const price = parseFloat(p.price || 0)
     const stock = p.stock && p.stock > 0 ? p.stock : 0
@@ -441,11 +489,15 @@ export default function ProductosModule() {
                   </tr>
                 ) : filtered.map(p => {
                   const mg = margin(p)
-                  const isLowStock = p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock
+                  const dispStock = getDisplayStock(p)
+                  const isLowStock = !p.is_composite && p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock
                   return (
                     <tr key={p.id}>
                       <td>
-                        <div style={{ fontWeight: 500 }}>{p.name}</div>
+                        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {p.name}
+                          {p.is_composite && <span className="badge badge-primary" style={{ fontSize: '0.65rem' }}>Combo</span>}
+                        </div>
                         {p.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.description}</div>}
                       </td>
                       <td>
@@ -460,7 +512,7 @@ export default function ProductosModule() {
                         }
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--accent)' }}>{formatMoney(p.price)}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{formatMoney(p.cost_price)}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{formatMoney(getDisplayCost(p))}</td>
                       <td style={{ textAlign: 'right' }}>
                         {mg !== null
                           ? <span style={{ color: parseFloat(mg) >= 20 ? 'var(--success)' : 'var(--warning)', fontWeight: 500 }}>{mg}%</span>
@@ -469,7 +521,7 @@ export default function ProductosModule() {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <span style={{ color: isLowStock ? 'var(--danger)' : 'var(--text-primary)', fontWeight: isLowStock ? 700 : 400 }}>
-                          {p.stock ?? '∞'}
+                          {dispStock ?? '∞'}
                           {isLowStock && <AlertTriangle size={14} style={{marginLeft: 6, color:'var(--warning)'}}/>}
                         </span>
                       </td>
@@ -577,6 +629,66 @@ export default function ProductosModule() {
           </div>
 
           <div className="form-row">
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                <input
+                  type="checkbox"
+                  id="is_composite"
+                  checked={form.is_composite}
+                  onChange={e => setForm(p => ({ ...p, is_composite: e.target.checked, cost_price: e.target.checked ? '' : p.cost_price, stock: e.target.checked ? '' : p.stock, min_stock: e.target.checked ? '' : p.min_stock }))}
+                />
+                <label htmlFor="is_composite" style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  Es un Producto Compuesto (Combo)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {form.is_composite && (
+            <div style={{ border: '1px solid var(--border)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
+              <h4 style={{ marginBottom: '10px', fontSize: '0.9rem' }}>Productos Base</h4>
+              {form.components.map((c, i) => {
+                const p = products.find(prod => prod.id === c.component_product_id)
+                return (
+                  <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                    <select
+                      value={c.component_product_id}
+                      onChange={e => {
+                        const newC = [...form.components]
+                        newC[i].component_product_id = e.target.value
+                        setForm(prev => ({ ...prev, components: newC }))
+                      }}
+                      style={{ flex: 1 }}
+                    >
+                      <option value="">Seleccionar producto...</option>
+                      {products.filter(prod => !prod.is_composite && prod.is_active).map(prod => (
+                        <option key={prod.id} value={prod.id}>{prod.name} (Stock: {prod.stock ?? '∞'})</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={c.quantity}
+                      onChange={e => {
+                        const newC = [...form.components]
+                        newC[i].quantity = parseInt(e.target.value) || 1
+                        setForm(prev => ({ ...prev, components: newC }))
+                      }}
+                      style={{ width: '80px' }}
+                      min="1"
+                    />
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, components: prev.components.filter((_, idx) => idx !== i) }))} className="btn btn-danger btn-sm">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )
+              })}
+              <button type="button" onClick={() => setForm(prev => ({ ...prev, components: [...prev.components, { component_product_id: '', quantity: 1 }] }))} className="btn btn-secondary btn-sm" style={{ marginTop: '8px' }}>
+                <Plus size={14} /> Agregar producto
+              </button>
+            </div>
+          )}
+
+          <div className="form-row">
             <div className="form-group">
               <label className="form-label">Precio de venta *</label>
               <input
@@ -587,16 +699,18 @@ export default function ProductosModule() {
                 min="0" step="0.01"
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">Precio de costo</label>
-              <input
-                type="number"
-                value={form.cost_price}
-                onChange={e => setForm(p => ({ ...p, cost_price: e.target.value }))}
-                placeholder="0.00"
-                min="0" step="0.01"
-              />
-            </div>
+            {!form.is_composite && (
+              <div className="form-group">
+                <label className="form-label">Precio de costo</label>
+                <input
+                  type="number"
+                  value={form.cost_price}
+                  onChange={e => setForm(p => ({ ...p, cost_price: e.target.value }))}
+                  placeholder="0.00"
+                  min="0" step="0.01"
+                />
+              </div>
+            )}
           </div>
 
           {form.price && form.cost_price && (
@@ -610,28 +724,30 @@ export default function ProductosModule() {
             </div>
           )}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Stock actual</label>
-              <input
-                type="number"
-                value={form.stock}
-                onChange={e => setForm(p => ({ ...p, stock: e.target.value }))}
-                placeholder="Dejar vacío si es ilimitado"
-                min="0"
-              />
+          {!form.is_composite && (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Stock actual</label>
+                <input
+                  type="number"
+                  value={form.stock}
+                  onChange={e => setForm(p => ({ ...p, stock: e.target.value }))}
+                  placeholder="Dejar vacío si es ilimitado"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Stock mínimo (alerta)</label>
+                <input
+                  type="number"
+                  value={form.min_stock}
+                  onChange={e => setForm(p => ({ ...p, min_stock: e.target.value }))}
+                  placeholder="Ej: 5"
+                  min="0"
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Stock mínimo (alerta)</label>
-              <input
-                type="number"
-                value={form.min_stock}
-                onChange={e => setForm(p => ({ ...p, min_stock: e.target.value }))}
-                placeholder="Ej: 5"
-                min="0"
-              />
-            </div>
-          </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Descripción (opcional)</label>
