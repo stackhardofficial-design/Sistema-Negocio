@@ -60,8 +60,10 @@ export default function FinanzasModule() {
       setExpenses(exps)
       
       // Obtener resumen de ventas para calcular ingresos
-      // Se pasa 23:59:59 al dateTo para incluir todo el día
-      const sales = await dbGetSaleSummary(tenantId, dateFrom + 'T00:00:00Z', dateTo + 'T23:59:59Z')
+      // Ajustar zona horaria a Argentina (-03:00) para calcular correctamente el inicio y fin del día
+      const startISO = new Date(`${dateFrom}T00:00:00-03:00`).toISOString()
+      const endISO = new Date(`${dateTo}T23:59:59-03:00`).toISOString()
+      const sales = await dbGetSaleSummary(tenantId, startISO, endISO)
       setSalesSummary(sales)
 
       // Obtener productos para resolver códigos de barras antiguos
