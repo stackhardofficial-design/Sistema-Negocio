@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant, dbLogActivity } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Settings, Plus, Edit2, Trash2, Tag, Building2 } from 'lucide-react'
+import { Settings, Plus, Edit2, Trash2, Tag, Building2, RefreshCw } from 'lucide-react'
 
 export default function ConfiguracionModule() {
   const { tenantId, tenant, setTenant, userInfo, toast } = useApp()
@@ -84,6 +84,24 @@ export default function ConfiguracionModule() {
     }
   }
 
+  async function handleUpdateApp() {
+    const confirmUpdate = window.confirm('¿Forzar actualización a la última versión? Esto recargará el sistema y limpiará el caché local.')
+    if (confirmUpdate) {
+      if ('serviceWorker' in navigator) {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          for (const reg of regs) {
+            await reg.unregister()
+          }
+        } catch(e) {
+          console.error('Error unregistering sw', e)
+        }
+      }
+      // Force reload ignoring cache
+      window.location.reload(true)
+    }
+  }
+
   return (
     <div className="fade-in">
       <div className="module-header">
@@ -159,6 +177,19 @@ export default function ConfiguracionModule() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Sistema */}
+        <div className="card">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', marginBottom: '16px' }}>
+            <RefreshCw size={16} color="var(--accent)" /> Sistema y Actualizaciones
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            Si notas que el sistema está desactualizado o hay un error de caché, puedes forzar la descarga de la última versión desde Vercel.
+          </p>
+          <button onClick={handleUpdateApp} className="btn btn-secondary btn-sm" style={{ gap: '6px' }}>
+            <RefreshCw size={14} /> Actualizar a última versión
+          </button>
         </div>
       </div>
 

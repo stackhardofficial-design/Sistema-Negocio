@@ -72,15 +72,22 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         scannerRef.current = html5QrCode
 
         await html5QrCode.start(
-          { facingMode: 'environment' },
+          { 
+            facingMode: 'environment',
+            width: { ideal: 640 }, // Bajar la resolución a 640x480 es LA CLAVE para que vuele en iPhone
+            height: { ideal: 480 } 
+          },
           {
-            fps: 15, // iOS no soporta bien 60fps procesando barcodes (cuelga la CPU)
-            qrbox: { width: 300, height: 150 }, // Reduce dramáticamente el área a escanear (más rápido)
+            fps: 15,
+            qrbox: (vw, vh) => {
+              const min = Math.min(vw, vh)
+              return { width: min * 0.85, height: min * 0.4 } // Área dinámica y pequeña para foco rápido
+            },
             aspectRatio: 1.0,
             experimentalFeatures: {
               useBarCodeDetectorIfSupported: true
             },
-            disableFlip: true, // Quitar flip inverso hace el escaneo 2x más rápido
+            disableFlip: true,
             // EAN_13=9, EAN_8=10, UPC_A=14, CODE_128=5, CODE_39=3
             formatsToSupport: [9, 10, 14, 5, 3]
           },
