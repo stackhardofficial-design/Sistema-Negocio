@@ -16,6 +16,11 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
   const uid = useId().replace(/:/g, '')
   const containerId = `barcode-reader-${uid}`
 
+  const latestOnScan = useRef(onScan)
+  useEffect(() => {
+    latestOnScan.current = onScan
+  }, [onScan])
+
   // ===== LECTOR FÍSICO (USB HID) =====
   useEffect(() => {
     if (!active) return
@@ -40,7 +45,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
 
   async function handleScanned(barcode) {
     setScanning(true)
-    try { await onScan(barcode.trim()) } finally { setScanning(false) }
+    try { await latestOnScan.current(barcode.trim()) } finally { setScanning(false) }
   }
 
   // ===== CÁMARA =====
