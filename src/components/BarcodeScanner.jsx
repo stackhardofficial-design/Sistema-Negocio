@@ -171,10 +171,26 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       {error && (
         <div style={{
           color: 'var(--danger)', fontSize: '0.75rem',
-          padding: '4px 8px', background: 'rgba(239,68,68,0.1)',
-          borderRadius: '6px', marginTop: '4px'
+          padding: '8px', background: 'rgba(239,68,68,0.1)',
+          borderRadius: '6px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px'
         }}>
           {error}
+          <button 
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={async () => {
+              try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                stream.getTracks().forEach(t => t.stop())
+                setError('')
+                setCameraOpen(true)
+              } catch (e) {
+                alert('La cámara sigue bloqueada por tu teléfono. En iPhone: ve a Configuración > Safari > Cámara, y ponlo en "Permitir" o "Preguntar". Si usas una app instalada, puede que debas reinstalarla tras dar el permiso en Safari.')
+              }
+            }}
+          >
+            <Camera size={14} /> Dar permiso manual
+          </button>
         </div>
       )}
 
