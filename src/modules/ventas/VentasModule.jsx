@@ -7,7 +7,7 @@ import {
 import BarcodeScanner from '../../components/BarcodeScanner'
 import {
   Barcode, Package, Zap, Minus, Plus,
-  Banknote, Smartphone, BookOpen, AlertCircle, ChevronDown, User
+  AlertCircle, ChevronDown, User
 } from 'lucide-react'
 
 function playBeep() {
@@ -31,30 +31,99 @@ function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
 }
 
+// ===== SVG ICONS CUSTOM =====
+function IconEfectivo({ active }) {
+  const c = active ? '#10b981' : '#6b7280'
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Billete */}
+      <rect x="3" y="10" width="30" height="18" rx="3" fill={active ? 'rgba(16,185,129,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.8"/>
+      {/* Circulo central */}
+      <circle cx="18" cy="19" r="5" stroke={c} strokeWidth="1.6" fill={active ? 'rgba(16,185,129,0.12)' : 'none'}/>
+      {/* Signo $ */}
+      <text x="18" y="23" textAnchor="middle" fontSize="7" fontWeight="bold" fill={c} fontFamily="system-ui">$</text>
+      {/* Esquinas decorativas */}
+      <rect x="5" y="12" width="4" height="3" rx="1" fill={c} opacity="0.5"/>
+      <rect x="27" y="23" width="4" height="3" rx="1" fill={c} opacity="0.5"/>
+      {/* Lineas decorativas */}
+      <line x1="5" y1="22" x2="9" y2="22" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
+      <line x1="27" y1="17" x2="31" y2="17" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
+    </svg>
+  )
+}
+
+function IconMercadoPago({ active }) {
+  // Logo inspirado en MercadoPago con colores del sistema (azul #3b82f6)
+  const c = active ? '#3b82f6' : '#6b7280'
+  const bg = active ? 'rgba(59,130,246,0.18)' : 'rgba(107,114,128,0.1)'
+  return (
+    <svg width="40" height="36" viewBox="0 0 40 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Fondo redondeado */}
+      <rect x="2" y="4" width="36" height="28" rx="8" fill={bg} stroke={c} strokeWidth="1.5"/>
+      {/* Letra M estilizada - estilo MercadoPago */}
+      <path d="M10 25 L10 14 L16 21 L22 14 L22 25" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* Letra P estilizada */}
+      <path d="M25 25 L25 14" stroke={c} strokeWidth="2.2" strokeLinecap="round" fill="none"/>
+      <path d="M25 14 C25 14 31 14 31 18.5 C31 23 25 23 25 23" stroke={c} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* Punto acento azul */}
+      {active && <circle cx="34" cy="8" r="3" fill="#3b82f6"/>}
+    </svg>
+  )
+}
+
+function IconDeudor({ active }) {
+  const c = active ? '#f59e0b' : '#6b7280'
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Libreta */}
+      <rect x="7" y="5" width="22" height="27" rx="3" fill={active ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.08)'} stroke={c} strokeWidth="1.7"/>
+      {/* Espiral izquierda */}
+      <line x1="7" y1="5" x2="7" y2="32" stroke={c} strokeWidth="3" strokeLinecap="round"/>
+      {/* Lineas de texto */}
+      <line x1="12" y1="13" x2="25" y2="13" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+      <line x1="12" y1="18" x2="25" y2="18" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+      <line x1="12" y1="23" x2="20" y2="23" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+      {/* Badge deuda */}
+      {active && (
+        <>
+          <circle cx="27" cy="9" r="5" fill="#f59e0b"/>
+          <text x="27" y="12.5" textAnchor="middle" fontSize="6.5" fontWeight="bold" fill="#0f1117" fontFamily="system-ui">$</text>
+        </>
+      )}
+    </svg>
+  )
+}
+
 const PAYMENT_METHODS = [
   {
     id: 'efectivo',
     label: 'Efectivo',
-    icon: Banknote,
+    sublabel: 'Pago en mano',
+    IconComponent: IconEfectivo,
     color: '#10b981',
     colorSoft: 'rgba(16,185,129,0.12)',
-    colorBorder: 'rgba(16,185,129,0.4)',
+    colorBorder: 'rgba(16,185,129,0.45)',
+    colorGlow: 'rgba(16,185,129,0.25)',
   },
   {
     id: 'transferencia',
-    label: 'Transferencia',
-    icon: Smartphone,
+    label: 'Mercado Pago',
+    sublabel: 'Transferencia',
+    IconComponent: IconMercadoPago,
     color: '#3b82f6',
     colorSoft: 'rgba(59,130,246,0.12)',
-    colorBorder: 'rgba(59,130,246,0.4)',
+    colorBorder: 'rgba(59,130,246,0.45)',
+    colorGlow: 'rgba(59,130,246,0.25)',
   },
   {
     id: 'deudor',
     label: 'Deudor',
-    icon: BookOpen,
-    color: '#ef4444',
-    colorSoft: 'rgba(239,68,68,0.12)',
-    colorBorder: 'rgba(239,68,68,0.4)',
+    sublabel: 'Cargar a cuenta',
+    IconComponent: IconDeudor,
+    color: '#f59e0b',
+    colorSoft: 'rgba(245,158,11,0.12)',
+    colorBorder: 'rgba(245,158,11,0.45)',
+    colorGlow: 'rgba(245,158,11,0.22)',
   },
 ]
 
@@ -274,11 +343,11 @@ export default function VentasModule() {
             {paymentMethod ? '✓ Método de pago' : 'Método de pago (obligatorio)'}
           </div>
 
-          {/* Botones de método */}
+          {/* ===== BOTONES DE MÉTODO - PREMIUM ===== */}
           <div style={{ display: 'flex', gap: '8px' }}>
             {PAYMENT_METHODS.map(method => {
               const isActive = paymentMethod === method.id
-              const Icon = method.icon
+              const { IconComponent } = method
               return (
                 <button
                   key={method.id}
@@ -287,25 +356,57 @@ export default function VentasModule() {
                   disabled={loading}
                   style={{
                     flex: 1,
-                    height: '58px',
-                    borderRadius: '14px',
+                    height: '84px',
+                    borderRadius: '16px',
                     border: `2px solid ${isActive ? method.color : 'var(--border)'}`,
-                    background: isActive ? method.colorSoft : 'var(--bg)',
-                    color: isActive ? method.color : 'var(--text-muted)',
+                    background: isActive
+                      ? `linear-gradient(145deg, ${method.colorSoft}, rgba(255,255,255,0.02))`
+                      : 'var(--bg)',
                     cursor: loading ? 'not-allowed' : 'pointer',
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.18s',
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: '0.7rem',
-                    boxShadow: isActive ? `0 4px 14px ${method.colorSoft}` : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px',
+                    padding: '8px 4px',
+                    transition: 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',
+                    boxShadow: isActive
+                      ? `0 6px 20px ${method.colorGlow}, inset 0 1px 0 rgba(255,255,255,0.06)`
+                      : 'inset 0 1px 0 rgba(255,255,255,0.04)',
                     WebkitTapHighlightColor: 'transparent',
-                    transform: isActive ? 'scale(1.04)' : 'scale(1)',
+                    transform: isActive ? 'scale(1.05) translateY(-2px)' : 'scale(1) translateY(0)',
+                    position: 'relative',
+                    overflow: 'hidden',
                   }}
                 >
-                  <Icon size={20} />
-                  {method.label}
+                  {/* Brillo superior cuando activo */}
+                  {isActive && (
+                    <div style={{
+                      position: 'absolute', top: 0, left: 0, right: 0,
+                      height: '1px',
+                      background: `linear-gradient(90deg, transparent, ${method.color}, transparent)`,
+                      opacity: 0.6
+                    }} />
+                  )}
+                  <IconComponent active={isActive} />
+                  <div style={{
+                    fontSize: '0.68rem', fontWeight: 700,
+                    color: isActive ? method.color : 'var(--text-secondary)',
+                    letterSpacing: '0.01em',
+                    lineHeight: 1.2,
+                    transition: 'color 0.18s'
+                  }}>
+                    {method.label}
+                  </div>
+                  <div style={{
+                    fontSize: '0.58rem',
+                    color: isActive ? method.color : 'var(--text-muted)',
+                    opacity: isActive ? 0.75 : 0.6,
+                    letterSpacing: '0.02em',
+                    transition: 'all 0.18s'
+                  }}>
+                    {method.sublabel}
+                  </div>
                 </button>
               )
             })}

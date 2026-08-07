@@ -3,3 +3,4 @@ dist/
 .env
 .env.local
 Info importante sistema negocio.txt
+.vercel
