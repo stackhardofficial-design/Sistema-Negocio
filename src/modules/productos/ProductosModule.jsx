@@ -205,14 +205,14 @@ export default function ProductosModule() {
 
   function openCreate() {
     const lastCategory = localStorage.getItem('last_product_category') || ''
-    setForm({ ...EMPTY_PRODUCT, category_id: lastCategory })
-    setModal({ open: true, edit: null })
+    setForm({ ...EMPTY_PRODUCT, category_id: lastCategory, is_composite: false })
+    setModal({ open: true, edit: null, type: 'normal' })
   }
 
   function openCreateCombo() {
     const lastCategory = localStorage.getItem('last_product_category') || ''
-    setForm({ ...EMPTY_PRODUCT, category_id: lastCategory, is_composite: true })
-    setModal({ open: true, edit: null })
+    setForm({ ...EMPTY_PRODUCT, category_id: lastCategory, is_composite: true, components: [{ component_product_id: '', quantity: 1 }] })
+    setModal({ open: true, edit: null, type: 'combo' })
   }
 
   function openEdit(product) {
@@ -232,7 +232,7 @@ export default function ProductosModule() {
         quantity: c.quantity
       })) : []
     })
-    setModal({ open: true, edit: product })
+    setModal({ open: true, edit: product, type: (product.is_composite ?? false) ? 'combo' : 'normal' })
   }
 
   async function handleLookupBarcode() {
@@ -304,7 +304,7 @@ export default function ProductosModule() {
 
       if (!form.is_composite && added !== 0) {
         const suggestedCost = form.cost_price ? (form.cost_price * added) : ''
-        setModal({ open: false, edit: null })
+        setModal({ open: false, edit: null, type: null })
         setExpenseConfirmModal({
           open: true,
           product: createdProduct,
@@ -315,7 +315,7 @@ export default function ProductosModule() {
         return
       }
 
-      setModal({ open: false, edit: null })
+      setModal({ open: false, edit: null, type: null })
       load()
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
@@ -561,14 +561,14 @@ export default function ProductosModule() {
       {/* ===== MODAL Producto ===== */}
       <Modal
         open={modal.open}
-        onClose={() => setModal({ open: false, edit: null })}
-        title={modal.edit ? 'Editar producto' : 'Nuevo producto'}
+        onClose={() => setModal({ open: false, edit: null, type: null })}
+        title={modal.edit ? (modal.type === 'combo' ? 'Editar Combo' : 'Editar producto') : (modal.type === 'combo' ? 'Nuevo Combo' : 'Nuevo producto')}
         size="lg"
         footer={
           <>
-            <button onClick={() => setModal({ open: false, edit: null })} className="btn btn-secondary">Cancelar</button>
+            <button onClick={() => setModal({ open: false, edit: null, type: null })} className="btn btn-secondary">Cancelar</button>
             <button onClick={handleSave} className="btn btn-primary" disabled={saving}>
-              {saving ? 'Guardando...' : modal.edit ? 'Guardar cambios' : 'Crear producto'}
+              {saving ? 'Guardando...' : modal.edit ? 'Guardar cambios' : (modal.type === 'combo' ? 'Crear combo' : 'Crear producto')}
             </button>
           </>
         }
@@ -576,12 +576,12 @@ export default function ProductosModule() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="form-row">
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Nombre del producto *</label>
+              <label className="form-label">{modal.type === 'combo' ? 'Nombre del combo *' : 'Nombre del producto *'}</label>
               <input
                 type="text"
                 value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                placeholder="Ej: Coca Cola 500ml"
+                placeholder={modal.type === 'combo' ? 'Ej: Café con 2 medialunas' : 'Ej: Coca Cola 500ml'}
               />
             </div>
           </div>
@@ -637,25 +637,15 @@ export default function ProductosModule() {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                <input
-                  type="checkbox"
-                  id="is_composite"
-                  checked={form.is_composite}
-                  onChange={e => setForm(p => ({ ...p, is_composite: e.target.checked, cost_price: e.target.checked ? '' : p.cost_price, stock: e.target.checked ? '' : p.stock, min_stock: e.target.checked ? '' : p.min_stock }))}
-                />
-                <label htmlFor="is_composite" style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                  Es un Producto Compuesto (Combo)
-                </label>
-              </div>
-            </div>
-          </div>
-
           {form.is_composite && (
-            <div style={{ border: '1px solid var(--border)', padding: '14px', borderRadius: 'var(--radius-md)' }}>
-              <h4 style={{ marginBottom: '10px', fontSize: '0.9rem' }}>Productos Base</h4>
+            <div style={{ border: '1px solid var(--border)', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                ¿De qué productos está compuesto este combo?
+              </h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                Seleccioná los productos base e indicá cuántas unidades se necesitan por combo.
+              </p>
+              
               {form.components.map((c, i) => {
                 const p = products.find(prod => prod.id === c.component_product_id)
                 return (
@@ -667,13 +657,15 @@ export default function ProductosModule() {
                         newC[i].component_product_id = e.target.value
                         setForm(prev => ({ ...prev, components: newC }))
                       }}
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}
                     >
-                      <option value="">Seleccionar producto...</option>
+                      <option value="">Seleccionar un producto cargado...</option>
                       {products.filter(prod => !prod.is_composite && prod.is_active).map(prod => (
-                        <option key={prod.id} value={prod.id}>{prod.name} (Stock: {prod.stock ?? '∞'})</option>
+                        <option key={prod.id} value={prod.id}>{prod.name} (Disp: {prod.stock ?? '∞'} - Costo: {formatMoney(prod.cost_price)})</option>
                       ))}
                     </select>
+                    
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Cant:</span>
                     <input
                       type="number"
                       value={c.quantity}
@@ -682,17 +674,19 @@ export default function ProductosModule() {
                         newC[i].quantity = parseInt(e.target.value) || 1
                         setForm(prev => ({ ...prev, components: newC }))
                       }}
-                      style={{ width: '80px' }}
+                      style={{ width: '70px', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}
                       min="1"
                     />
-                    <button type="button" onClick={() => setForm(prev => ({ ...prev, components: prev.components.filter((_, idx) => idx !== i) }))} className="btn btn-danger btn-sm">
-                      <Trash2 size={14} />
+                    
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, components: prev.components.filter((_, idx) => idx !== i) }))} className="btn btn-danger btn-sm" title="Quitar producto" style={{ padding: '8px' }}>
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 )
               })}
-              <button type="button" onClick={() => setForm(prev => ({ ...prev, components: [...prev.components, { component_product_id: '', quantity: 1 }] }))} className="btn btn-secondary btn-sm" style={{ marginTop: '8px' }}>
-                <Plus size={14} /> Agregar producto
+              
+              <button type="button" onClick={() => setForm(prev => ({ ...prev, components: [...prev.components, { component_product_id: '', quantity: 1 }] }))} className="btn btn-secondary btn-sm" style={{ marginTop: '12px' }}>
+                <Plus size={14} /> Agregar otro producto al combo
               </button>
             </div>
           )}
