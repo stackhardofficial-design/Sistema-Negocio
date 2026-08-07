@@ -340,6 +340,14 @@ export async function dbCancelSale(saleId, userId, reason) {
   return data
 }
 
+export async function dbMarkAutoconsumo(saleId) {
+  const { data, error } = await sb.from('sales')
+    .update({ status: 'autoconsumo' })
+    .eq('id', saleId).select().single()
+  if (error) throw error
+  return data
+}
+
 export async function dbUpdateSaleItem(saleItemId, newQuantity) {
   // Obtener el item actual para calcular la diferencia de stock
   const { data: item, error: itemErr } = await sb.from('sale_items')

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetSales, dbCancelSale, dbLogActivity,
-  dbUpdateSaleItem, dbDeleteSaleItem
+  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -66,10 +66,11 @@ export default function RegistroVentasModule() {
     if (showLoading) setLoadingSales(false)
 
     const completed = data.filter(s => s.status === 'completed')
+    const autoconsumo = data.filter(s => s.status === 'autoconsumo')
     setTotals({
       sales: completed.reduce((a, s) => a + (s.total_amount || 0), 0),
-      profit: completed.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0),
-      count: completed.length
+      profit: completed.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0) - autoconsumo.reduce((a, s) => a + (s.total_cost || 0), 0),
+      count: completed.length + autoconsumo.length
     })
   }
 
@@ -178,6 +179,24 @@ export default function RegistroVentasModule() {
     }
   }
 
+  async function handleAutoconsumo() {
+    if (!editModal.sale) return
+    const confirm = window.confirm('¿Seguro que querés marcar esta venta como Autoconsumo? Esto dejará el ingreso en 0 y solo se contabilizará el costo como pérdida/consumo interno.')
+    if (!confirm) return
+    setSavingEdit(true)
+    try {
+      await dbMarkAutoconsumo(editModal.sale.id)
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'sale', editModal.sale.id, { reason: 'Marcado como autoconsumo' })
+      toast('Venta marcada como autoconsumo', 'success')
+      setEditModal({ open: false, sale: null, items: [] })
+      setDetailModal({ open: false, sale: null })
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const activeFilters = !!(filterDate || filterUser || filterSearch || filterStatus || filterPayment)
 
   return (
@@ -248,6 +267,7 @@ export default function RegistroVentasModule() {
               <option value="">Todos</option>
               <option value="completed">Completadas</option>
               <option value="cancelled">Anuladas</option>
+              <option value="autoconsumo">Autoconsumo</option>
             </select>
           </div>
           <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
@@ -470,6 +490,9 @@ export default function RegistroVentasModule() {
             <button onClick={() => setEditModal({ open: false, sale: null, items: [] })} className="btn btn-secondary">
               Cancelar
             </button>
+            <button onClick={handleAutoconsumo} className="btn" style={{ background: '#8b5cf6', color: 'white', border: 'none' }} disabled={savingEdit} title="Marcar venta como consumo interno (costo sin ganancia)">
+              {savingEdit ? '...' : <><Package size={14} /> Marcar Autoconsumo</>}
+            </button>
             <button onClick={saveEdit} className="btn btn-primary" disabled={savingEdit}>
               {savingEdit ? 'Guardando...' : <><Save size={14} /> Guardar cambios</>}
             </button>
@@ -567,7 +590,8 @@ export default function RegistroVentasModule() {
 // ===== COMPONENTE FILA DE VENTA =====
 function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
   const cancelled = sale.status === 'cancelled'
-  const profit = (sale.total_amount || 0) - (sale.total_cost || 0)
+  const isAutoconsumo = sale.status === 'autoconsumo'
+  const profit = isAutoconsumo ? -(sale.total_cost || 0) : (sale.total_amount || 0) - (sale.total_cost || 0)
 
   return (
     <tr 
@@ -575,12 +599,12 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
       style={{ 
         cursor: 'pointer',
         opacity: cancelled ? 0.7 : 1,
-        background: cancelled ? 'var(--danger-soft)' : 'var(--bg-card)',
+        background: cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)',
         borderBottom: '1px solid var(--border)',
         transition: 'all 0.15s ease'
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = cancelled ? 'var(--danger-soft)' : 'var(--bg-secondary)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = cancelled ? 'var(--danger-soft)' : 'var(--bg-card)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)' }}
     >
       <td style={{ padding: '12px' }}>
         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDate(sale.created_at)}</div>
@@ -590,9 +614,9 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
             width: '28px', height: '28px', borderRadius: '50%',
-            background: cancelled ? 'var(--danger-soft)' : 'var(--accent-soft)',
+            background: cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.15)' : 'var(--accent-soft)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: cancelled ? 'var(--danger)' : 'var(--accent)',
+            color: cancelled ? 'var(--danger)' : isAutoconsumo ? '#8b5cf6' : 'var(--accent)',
             fontWeight: 700, fontSize: '0.8rem'
           }}>
             {(sale.users?.name || 'U').charAt(0).toUpperCase()}
@@ -614,25 +638,25 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
         <PaymentBadge method={sale.payment_method} debtorName={sale.debtors?.name} />
       </td>
       <td style={{ padding: '12px', textAlign: 'center' }}>
-        <span className={`badge ${cancelled ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
-          {cancelled ? 'ANULADA' : 'COMPLETADA'}
+        <span className={`badge ${cancelled ? 'badge-danger' : isAutoconsumo ? 'badge-primary' : 'badge-success'}`} style={{ fontSize: '0.7rem', background: isAutoconsumo ? '#8b5cf6' : undefined, color: isAutoconsumo ? 'white' : undefined, border: isAutoconsumo ? 'none' : undefined }}>
+          {cancelled ? 'ANULADA' : isAutoconsumo ? 'AUTOCONSUMO' : 'COMPLETADA'}
         </span>
       </td>
       <td style={{ padding: '12px', textAlign: 'right' }}>
-        <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: cancelled ? 'line-through' : 'none' }}>
-          {formatMoney(sale.total_amount)}
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: cancelled ? 'line-through' : 'none', color: isAutoconsumo ? 'var(--text-muted)' : 'inherit' }}>
+          {isAutoconsumo ? '$0 (Auto)' : formatMoney(sale.total_amount)}
         </div>
         {!cancelled && isAdmin && (
-          <div style={{ fontSize: '0.7rem', color: 'var(--success)' }}>
-            + {formatMoney(profit)}
+          <div style={{ fontSize: '0.7rem', color: isAutoconsumo ? 'var(--danger)' : 'var(--success)' }}>
+            {isAutoconsumo ? '-' : '+'} {formatMoney(Math.abs(profit))}
           </div>
         )}
       </td>
       {isAdmin && (
         <td style={{ padding: '12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-          {!cancelled ? (
+          {!cancelled && !isAutoconsumo ? (
             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-              <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Editar" style={{ padding: '4px 8px' }}>
+              <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Editar / Autoconsumo" style={{ padding: '4px 8px' }}>
                 <Edit2 size={12} />
               </button>
               <button onClick={onCancel} className="btn btn-danger btn-sm" title="Anular" style={{ padding: '4px 8px' }}>

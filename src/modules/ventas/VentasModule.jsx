@@ -212,6 +212,13 @@ export default function VentasModule() {
         setBarcodeInput('')
         return
       }
+
+      if (product.stock <= 0) {
+        toast(`Error: El producto "${product.name}" no tiene stock disponible`, 'danger')
+        setBarcodeInput('')
+        return
+      }
+
       const total = product.price * qty
       const cost = (product.cost_price || 0) * qty
 
