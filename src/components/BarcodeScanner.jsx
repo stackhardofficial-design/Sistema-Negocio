@@ -72,11 +72,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         scannerRef.current = html5QrCode
 
         await html5QrCode.start(
-          { 
-            facingMode: 'environment',
-            width: { ideal: 640 }, // Bajar la resolución a 640x480 es LA CLAVE para que vuele en iPhone
-            height: { ideal: 480 } 
-          },
+          { facingMode: 'environment' },
           {
             fps: 15,
             aspectRatio: 1.0,
