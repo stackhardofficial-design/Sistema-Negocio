@@ -74,12 +74,15 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
         await html5QrCode.start(
           { facingMode: 'environment' },
           {
-            fps: 60,
+            fps: 15, // iOS no soporta bien 60fps procesando barcodes (cuelga la CPU)
+            qrbox: { width: 300, height: 150 }, // Reduce dramáticamente el área a escanear (más rápido)
+            aspectRatio: 1.0,
             experimentalFeatures: {
               useBarCodeDetectorIfSupported: true
             },
-            disableFlip: false, // Permitir escaneo inverso si el celu está al revés
-            formatsToSupport: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            disableFlip: true, // Quitar flip inverso hace el escaneo 2x más rápido
+            // EAN_13=9, EAN_8=10, UPC_A=14, CODE_128=5, CODE_39=3
+            formatsToSupport: [9, 10, 14, 5, 3]
           },
           async (code) => {
             if (stopped) return
