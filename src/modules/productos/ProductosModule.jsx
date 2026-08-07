@@ -209,6 +209,12 @@ export default function ProductosModule() {
     setModal({ open: true, edit: null })
   }
 
+  function openCreateCombo() {
+    const lastCategory = localStorage.getItem('last_product_category') || ''
+    setForm({ ...EMPTY_PRODUCT, category_id: lastCategory, is_composite: true })
+    setModal({ open: true, edit: null })
+  }
+
   function openEdit(product) {
     setForm({
       name: product.name || '',
@@ -401,6 +407,9 @@ export default function ProductosModule() {
           </button>
           <button onClick={openCreate} className="btn btn-primary">
             <Plus size={16} /> Nuevo producto
+          </button>
+          <button onClick={openCreateCombo} className="btn btn-secondary" style={{ border: '1px solid var(--accent)', color: 'var(--accent)' }}>
+            <Package size={16} /> Nuevo combo
           </button>
         </div>
       </div>
