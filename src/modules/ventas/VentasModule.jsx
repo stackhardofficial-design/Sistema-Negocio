@@ -711,7 +711,7 @@ export default function VentasModule() {
               active={!loading && canScan}
               showCamera={false}
               inline={true}
-              autoStart={false}
+              autoStart={true}
             />
           </div>
         </div>
