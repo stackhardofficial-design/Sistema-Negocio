@@ -327,6 +327,19 @@ export default function ProductosModule() {
     return (((p.price - p.cost_price) / p.price) * 100).toFixed(1)
   }
 
+  const totalInvertido = products.reduce((acc, p) => {
+    const cost = parseFloat(p.cost_price || 0)
+    const stock = p.stock && p.stock > 0 ? p.stock : 0
+    return acc + (cost * stock)
+  }, 0)
+
+  const gananciaEsperada = products.reduce((acc, p) => {
+    const cost = parseFloat(p.cost_price || 0)
+    const price = parseFloat(p.price || 0)
+    const stock = p.stock && p.stock > 0 ? p.stock : 0
+    return acc + ((price - cost) * stock)
+  }, 0)
+
   return (
     <div className="fade-in">
       <div className="module-header">
@@ -383,6 +396,18 @@ export default function ProductosModule() {
           <span className="badge badge-neutral">{filtered.length} productos</span>
           <span className="badge badge-warning">{products.filter(p => p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock).length} bajo stock</span>
           <span className="badge badge-success">{products.filter(p => p.is_active).length} activos</span>
+        </div>
+
+        {/* Financial Stats */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <div style={{ padding: '8px 14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontSize: '0.9rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Plata costo invertida: </span>
+            <strong style={{ color: 'var(--text-primary)' }}>{formatMoney(totalInvertido)}</strong>
+          </div>
+          <div style={{ padding: '8px 14px', background: 'var(--success-soft)', borderRadius: 'var(--radius-md)', fontSize: '0.9rem' }}>
+            <span style={{ color: 'var(--text-primary)' }}>Ganancia esperada: </span>
+            <strong style={{ color: 'var(--success)' }}>{formatMoney(gananciaEsperada)}</strong>
+          </div>
         </div>
 
         {/* Table */}
