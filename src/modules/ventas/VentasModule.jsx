@@ -163,6 +163,38 @@ export default function VentasModule() {
   const [loading, setLoading] = useState(false)
   const [flashSuccess, setFlashSuccess] = useState(false)
   const barcodeRef = useRef(null)
+  
+  // ===== WAKE LOCK (Evitar que se apague la pantalla en móviles) =====
+  const wakeLock = useRef(null)
+
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock.current = await navigator.wakeLock.request('screen')
+          console.log('Wake Lock activado: pantalla encendida')
+        } catch (err) {
+          console.error(`Error WakeLock: ${err.name}, ${err.message}`)
+        }
+      }
+    }
+    requestWakeLock()
+
+    const handleVisibilityChange = () => {
+      if (wakeLock.current !== null && document.visibilityState === 'visible') {
+        requestWakeLock()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (wakeLock.current) {
+        wakeLock.current.release()
+        wakeLock.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => { quantityRef.current = quantity }, [quantity])
 
