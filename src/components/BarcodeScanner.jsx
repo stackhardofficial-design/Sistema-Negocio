@@ -79,10 +79,6 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
           },
           {
             fps: 15,
-            qrbox: (vw, vh) => {
-              const min = Math.min(vw, vh)
-              return { width: min * 0.85, height: min * 0.4 } // Área dinámica y pequeña para foco rápido
-            },
             aspectRatio: 1.0,
             experimentalFeatures: {
               useBarCodeDetectorIfSupported: true
