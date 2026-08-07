@@ -53,24 +53,39 @@ function IconEfectivo({ active }) {
 }
 
 function IconMercadoPago({ active }) {
-  // Logo oficial Mercado Pago: círculo azul con 'mp' blanco
-  const blue = active ? '#009EE3' : '#6b7280'
+  // Logo clásico del apretón de manos de Mercado Pago, adaptado a los colores del sistema
+  const color = active ? '#009EE3' : '#6b7280'
+  const opacityBg = active ? 0.15 : 0.05
   return (
     <svg width="42" height="36" viewBox="0 0 42 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Círculo principal - color oficial MP */}
-      <circle cx="21" cy="18" r="15" fill={blue} />
-      {/* Texto 'mp' en blanco - estilo oficial */}
-      <text
-        x="21" y="23"
-        textAnchor="middle"
-        fontSize="12"
-        fontWeight="800"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif"
-        fill="white"
-        letterSpacing="-0.5"
-      >mp</text>
-      {/* Punto decorativo oficial */}
-      {active && <circle cx="33" cy="7" r="3.5" fill="#009EE3" opacity="0.6" />}
+      {/* Fondo ovalado característico */}
+      <ellipse cx="21" cy="18" rx="18" ry="12" fill={color} fillOpacity={opacityBg} />
+      
+      {/* Contorno del óvalo */}
+      <ellipse cx="21" cy="18" rx="18" ry="12" stroke={color} strokeWidth="1.5" />
+
+      {/* Relleno superior e inferior para enmarcar las manos */}
+      <path d="M4 18 C4 11 11 6 21 6 C31 6 38 11 38 18 L4 18 Z" fill={color} fillOpacity="0.8" />
+      <path d="M4 18 C4 25 11 30 21 30 C31 30 38 25 38 18 L4 18 Z" fill={color} fillOpacity="0.8" />
+
+      {/* Espacio en blanco del apretón (máscara simple visual) */}
+      <path d="M4 18 C6 18 10 16 16 16 L25 16 C32 16 36 18 38 18 C36 21 32 23 25 23 L16 23 C10 23 6 21 4 18 Z" fill={active ? '#ffffff' : 'var(--bg-secondary)'} />
+
+      {/* Mano izquierda (silueta) */}
+      <path d="M6 18 C8 17 12 16.5 15 16.5 C16 16.5 18 17 19 18 C20 19 20.5 20 20 21 C19 22 17 22.5 15 22.5 C13 22.5 11 21.5 10 21" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      
+      {/* Dedos mano izquierda */}
+      <path d="M12 21.5 C13 22.5 15 22.5 16 21.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M14 22 C15 23 16 23 17 22" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+
+      {/* Mano derecha (silueta) */}
+      <path d="M36 18 C34 17.5 30 17 27 17 C25 17 23 16.5 22 17.5 C21 18.5 22 19.5 23 20.5 C24 21.5 26 21.5 28 20.5 C29 19.5 30 19.5 31 19" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      
+      {/* Manga derecha */}
+      <path d="M30 17 L29 19" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      
+      {/* Pulgar */}
+      <path d="M22 17.5 C20 18.5 21 20 22 20.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   )
 }
