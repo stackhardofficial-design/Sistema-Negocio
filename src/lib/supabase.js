@@ -238,7 +238,7 @@ export async function lookupBarcode(barcode) {
 // ===== SALES =====
 export async function dbGetSales(tenantId, opts = {}) {
   let q = sb.from('sales')
-    .select('*, sale_items(*, products(name, barcode, categories(name))), users!sales_user_id_fkey(name)')
+    .select('*, sale_items(*, products(name, barcode, categories(name))), users!sales_user_id_fkey(name), debtors(name)')
     .eq('tenant_id', tenantId)
 
   if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
@@ -263,14 +263,16 @@ export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {
   return data || []
 }
 
-export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCost) {
+export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCost, paymentMethod = 'efectivo', debtorId = null) {
   // Create sale
   const { data: sale, error: saleErr } = await sb.from('sales').insert({
     tenant_id: tenantId,
     user_id: userId,
     total_amount: totalAmount,
     total_cost: totalCost,
-    status: 'completed'
+    status: 'completed',
+    payment_method: paymentMethod,
+    debtor_id: debtorId || null
   }).select().single()
 
   if (saleErr) throw saleErr
@@ -495,7 +497,7 @@ export async function dbUpdateBuffetOrderStatus(orderId, status) {
 // ===== DEBTORS =====
 export async function dbGetDebtors(tenantId, opts = {}) {
   let q = sb.from('debtors')
-    .select('*, debtor_payments(amount, paid_at, note)')
+    .select('*, debtor_payments(amount, paid_at, note), debtor_charges(id, amount, note, items, created_at, sale_id)')
     .eq('tenant_id', tenantId)
   if (!opts.includeSettled) q = q.eq('is_settled', false)
   q = q.order('name')

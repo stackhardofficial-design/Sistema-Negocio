@@ -38,6 +38,7 @@ export default function RegistroVentasModule() {
   const [filterUser, setFilterUser] = useState('')
   const [filterSearch, setFilterSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('') // '' | 'completed' | 'cancelled'
+  const [filterPayment, setFilterPayment] = useState('') // '' | 'efectivo' | 'transferencia' | 'deudor'
 
   // ===== TOTALES =====
   const [totals, setTotals] = useState({ sales: 0, profit: 0, count: 0 })
@@ -75,6 +76,7 @@ export default function RegistroVentasModule() {
   // ===== FILTRADO =====
   const filteredSales = sales.filter(s => {
     if (filterStatus && s.status !== filterStatus) return false
+    if (filterPayment && s.payment_method !== filterPayment) return false
     if (filterDate && !s.created_at.startsWith(filterDate)) return false
     if (filterUser && !s.users?.name?.toLowerCase().includes(filterUser.toLowerCase())) return false
     if (filterSearch) {
@@ -176,7 +178,7 @@ export default function RegistroVentasModule() {
     }
   }
 
-  const activeFilters = !!(filterDate || filterUser || filterSearch || filterStatus)
+  const activeFilters = !!(filterDate || filterUser || filterSearch || filterStatus || filterPayment)
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -248,8 +250,17 @@ export default function RegistroVentasModule() {
               <option value="cancelled">Anuladas</option>
             </select>
           </div>
+          <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
+            <label className="form-label">Método de pago</label>
+            <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="transferencia">📲 Transferencia</option>
+              <option value="deudor">📒 Deudor</option>
+            </select>
+          </div>
           <button
-            onClick={() => { setFilterDate(''); setFilterUser(''); setFilterSearch(''); setFilterStatus('') }}
+            onClick={() => { setFilterDate(''); setFilterUser(''); setFilterSearch(''); setFilterStatus(''); setFilterPayment('') }}
             className="btn btn-secondary btn-sm"
           >
             <X size={14} /> Limpiar
@@ -275,6 +286,7 @@ export default function RegistroVentasModule() {
                   <th style={{ textAlign: 'left', padding: '12px' }}>Fecha y Hora</th>
                   <th style={{ textAlign: 'left', padding: '12px' }}>Vendedor</th>
                   <th style={{ textAlign: 'left', padding: '12px' }}>Productos</th>
+                  <th style={{ textAlign: 'center', padding: '12px' }}>Pago</th>
                   <th style={{ textAlign: 'center', padding: '12px' }}>Estado</th>
                   <th style={{ textAlign: 'right', padding: '12px' }}>Total</th>
                   {isAdmin() && <th style={{ textAlign: 'center', padding: '12px' }}>Acciones</th>}
@@ -321,6 +333,10 @@ export default function RegistroVentasModule() {
                 <span className={`badge ${detailModal.sale.status === 'completed' ? 'badge-success' : 'badge-danger'}`}>
                   {detailModal.sale.status === 'completed' ? 'Completada' : 'Anulada'}
                 </span>
+              </div>
+              <div>
+                <div className="form-label">Método de pago</div>
+                <PaymentBadge method={detailModal.sale.payment_method} debtorName={detailModal.sale.debtors?.name} />
               </div>
             </div>
 
@@ -595,6 +611,9 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
         )}
       </td>
       <td style={{ padding: '12px', textAlign: 'center' }}>
+        <PaymentBadge method={sale.payment_method} debtorName={sale.debtors?.name} />
+      </td>
+      <td style={{ padding: '12px', textAlign: 'center' }}>
         <span className={`badge ${cancelled ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
           {cancelled ? 'ANULADA' : 'COMPLETADA'}
         </span>
@@ -626,5 +645,25 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
         </td>
       )}
     </tr>
+  )
+}
+
+// ===== BADGE MÉTODO DE PAGO =====
+function PaymentBadge({ method, debtorName }) {
+  const map = {
+    efectivo:      { label: '💵 Efectivo',       bg: 'rgba(16,185,129,0.12)',  color: '#10b981', border: 'rgba(16,185,129,0.35)' },
+    transferencia: { label: '📲 Transferencia',  bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6', border: 'rgba(59,130,246,0.35)' },
+    deudor:        { label: debtorName ? `📒 ${debtorName}` : '📒 Deudor', bg: 'rgba(239,68,68,0.10)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+  }
+  const cfg = map[method] || { label: method || '—', bg: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: 'var(--border)' }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700,
+      background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+      whiteSpace: 'nowrap'
+    }}>
+      {cfg.label}
+    </span>
   )
 }

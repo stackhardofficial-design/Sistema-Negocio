@@ -236,21 +236,66 @@ export default function DeudoresModule() {
                     {isExpanded ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
                   </div>
 
-                  {/* Payments detail */}
-                  {isExpanded && (d.debtor_payments || []).length > 0 && (
-                    <div className="fade-in" style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
-                        Historial de pagos
-                      </div>
-                      {d.debtor_payments.map((pay, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.85rem', borderBottom: '1px solid var(--border)' }}>
-                          <div>
-                            <span style={{ color: 'var(--success)', fontWeight: 600 }}>+{formatMoney(pay.amount)}</span>
-                            {pay.note && <span style={{ marginLeft: '8px', color: 'var(--text-muted)' }}>{pay.note}</span>}
+                  {/* Historial expandido: Cargos + Pagos */}
+                  {isExpanded && (
+                    <div className="fade-in" style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                      {/* CARGOS (deudas generadas) */}
+                      {(d.debtor_charges || []).length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--danger)', marginBottom: '6px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.06em' }}>
+                            📦 Cargos / Productos comprados
                           </div>
-                          <span style={{ color: 'var(--text-muted)' }}>{formatDate(pay.paid_at)}</span>
+                          {[...(d.debtor_charges || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map((charge, i) => (
+                            <div key={i} style={{
+                              padding: '8px 10px', borderRadius: '8px',
+                              background: 'rgba(239,68,68,0.06)',
+                              border: '1px solid rgba(239,68,68,0.15)',
+                              marginBottom: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                                <span style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '0.88rem' }}>-{formatMoney(charge.amount)}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{formatDate(charge.created_at)}</span>
+                              </div>
+                              {/* Detalle de productos si vienen del escaneo */}
+                              {Array.isArray(charge.items) && charge.items.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  {charge.items.map((item, j) => (
+                                    <div key={j} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>• {item.quantity}x {item.product_name || item.name || '—'}</span>
+                                      <span style={{ color: 'var(--text-muted)' }}>{formatMoney(item.subtotal || item.unit_price * item.quantity)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : charge.note ? (
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{charge.note}</div>
+                              ) : null}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+
+                      {/* PAGOS realizados */}
+                      {(d.debtor_payments || []).length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--success)', marginBottom: '6px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.06em' }}>
+                            💵 Pagos realizados
+                          </div>
+                          {d.debtor_payments.map((pay, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '0.85rem', borderBottom: '1px solid var(--border)', background: 'rgba(16,185,129,0.04)', borderRadius: '6px', marginBottom: '4px' }}>
+                              <div>
+                                <span style={{ color: 'var(--success)', fontWeight: 600 }}>+{formatMoney(pay.amount)}</span>
+                                {pay.note && <span style={{ marginLeft: '8px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>{pay.note}</span>}
+                              </div>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>{formatDate(pay.paid_at)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {(d.debtor_charges || []).length === 0 && (d.debtor_payments || []).length === 0 && (
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center', padding: '8px' }}>Sin movimientos registrados</div>
+                      )}
                     </div>
                   )}
                 </div>

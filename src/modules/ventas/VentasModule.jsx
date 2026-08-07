@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
-  dbGetProductByBarcode, dbCreateSale, dbLogActivity
+  dbGetProductByBarcode, dbCreateSale, dbLogActivity,
+  dbGetDebtors, dbAddDebtorCharge
 } from '../../lib/supabase'
 import BarcodeScanner from '../../components/BarcodeScanner'
 import {
-  Barcode, CheckCircle2, Package, Zap, Hash, Minus, Plus
+  Barcode, Package, Zap, Minus, Plus,
+  Banknote, Smartphone, BookOpen, AlertCircle, ChevronDown, User
 } from 'lucide-react'
 
 function playBeep() {
@@ -16,10 +18,10 @@ function playBeep() {
     osc.connect(gain)
     gain.connect(ctx.destination)
     osc.type = 'sine'
-    osc.frequency.setValueAtTime(880, ctx.currentTime) // 880Hz
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
     gain.gain.setValueAtTime(0.1, ctx.currentTime)
     osc.start()
-    osc.stop(ctx.currentTime + 0.1) // 100ms
+    osc.stop(ctx.currentTime + 0.1)
   } catch(e) {
     console.error('Audio beep failed', e)
   }
@@ -29,26 +31,88 @@ function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
 }
 
+const PAYMENT_METHODS = [
+  {
+    id: 'efectivo',
+    label: 'Efectivo',
+    icon: Banknote,
+    color: '#10b981',
+    colorSoft: 'rgba(16,185,129,0.12)',
+    colorBorder: 'rgba(16,185,129,0.4)',
+  },
+  {
+    id: 'transferencia',
+    label: 'Transferencia',
+    icon: Smartphone,
+    color: '#3b82f6',
+    colorSoft: 'rgba(59,130,246,0.12)',
+    colorBorder: 'rgba(59,130,246,0.4)',
+  },
+  {
+    id: 'deudor',
+    label: 'Deudor',
+    icon: BookOpen,
+    color: '#ef4444',
+    colorSoft: 'rgba(239,68,68,0.12)',
+    colorBorder: 'rgba(239,68,68,0.4)',
+  },
+]
+
 export default function VentasModule() {
   const { tenantId, userInfo, toast } = useApp()
 
+  // ===== MÉTODO DE PAGO =====
+  const [paymentMethod, setPaymentMethod] = useState(null) // null | 'efectivo' | 'transferencia' | 'deudor'
+  const [selectedDebtor, setSelectedDebtor] = useState(null)
+  const [debtors, setDebtors] = useState([])
+  const [loadingDebtors, setLoadingDebtors] = useState(false)
+  const [debtorDropdownOpen, setDebtorDropdownOpen] = useState(false)
+
+  // ===== VENTA =====
   const [barcodeInput, setBarcodeInput] = useState('')
   const [quantity, setQuantity] = useState(1)
   const quantityRef = useRef(quantity)
-
-  useEffect(() => {
-    quantityRef.current = quantity
-  }, [quantity])
-
   const [loading, setLoading] = useState(false)
   const [flashSuccess, setFlashSuccess] = useState(false)
-
   const barcodeRef = useRef(null)
 
+  useEffect(() => { quantityRef.current = quantity }, [quantity])
 
+  // Cargar deudores cuando se selecciona "deudor"
+  useEffect(() => {
+    if (paymentMethod === 'deudor' && tenantId) {
+      setLoadingDebtors(true)
+      dbGetDebtors(tenantId, { includeSettled: false })
+        .then(data => setDebtors(data.filter(d => !d.is_settled)))
+        .finally(() => setLoadingDebtors(false))
+    }
+  }, [paymentMethod, tenantId])
+
+  // Cuando cambia método de pago: resetear deudor seleccionado
+  function selectPaymentMethod(method) {
+    setPaymentMethod(method)
+    setSelectedDebtor(null)
+    setDebtorDropdownOpen(false)
+    // Focus en barcode si no es deudor o ya tiene deudor
+    if (method !== 'deudor') {
+      setTimeout(() => barcodeRef.current?.focus(), 100)
+    }
+  }
+
+  // ¿Puede escanear?
+  const canScan = paymentMethod !== null && (paymentMethod !== 'deudor' || selectedDebtor !== null)
 
   const handleScan = useCallback(async (code) => {
     if (!code?.trim() || !tenantId || loading) return
+    if (!canScan) {
+      toast('Seleccioná el método de pago antes de escanear', 'warning')
+      return
+    }
+    if (paymentMethod === 'deudor' && !selectedDebtor) {
+      toast('Seleccioná un deudor antes de escanear', 'warning')
+      return
+    }
+
     const trimmed = code.trim()
     const qty = Math.max(1, quantityRef.current)
     setLoading(true)
@@ -61,32 +125,63 @@ export default function VentasModule() {
       }
       const total = product.price * qty
       const cost = (product.cost_price || 0) * qty
+
       const sale = await dbCreateSale(
         tenantId, userInfo?.id,
         [{ product_id: product.id, quantity: qty, unit_price: product.price, unit_cost: product.cost_price || 0 }],
-        total, cost
+        total, cost,
+        paymentMethod,
+        paymentMethod === 'deudor' ? selectedDebtor.id : null
       )
+
+      // Si es deudor: registrar cargo con detalle del producto
+      if (paymentMethod === 'deudor' && selectedDebtor) {
+        const chargeItems = [{
+          product_id: product.id,
+          product_name: product.name,
+          barcode: product.barcode,
+          quantity: qty,
+          unit_price: product.price,
+          subtotal: total
+        }]
+        await dbAddDebtorCharge(
+          selectedDebtor.id,
+          total,
+          `Venta: ${qty}x ${product.name}`,
+          chargeItems
+        )
+      }
+
       await dbLogActivity(tenantId, userInfo?.id, 'create', 'sale', sale.id, {
-        product: product.name, barcode: product.barcode, quantity: qty, total
+        product: product.name, barcode: product.barcode, quantity: qty, total,
+        payment_method: paymentMethod,
+        debtor: selectedDebtor?.name || null
       })
+
       playBeep()
       setFlashSuccess(true)
       setTimeout(() => setFlashSuccess(false), 300)
-      
-      toast(`${qty}x ${product.name} registrados: ${formatMoney(total)}`, 'success')
-      
+
+      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : `📒 ${selectedDebtor.name}`
+      toast(`${qty}x ${product.name} · ${formatMoney(total)} · ${methodLabel}`, 'success')
+
       setQuantity(1)
       setBarcodeInput('')
+      // Mantener método de pago seleccionado para la siguiente venta
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
       setBarcodeInput('')
     } finally {
       setLoading(false)
     }
-  }, [tenantId, userInfo, loading])
+  }, [tenantId, userInfo, loading, canScan, paymentMethod, selectedDebtor])
 
   function handleBarcodeSubmit(e) {
     e.preventDefault()
+    if (!canScan) {
+      toast('Seleccioná el método de pago antes de escanear', 'warning')
+      return
+    }
     if (barcodeInput.trim()) handleScan(barcodeInput.trim())
   }
 
@@ -97,6 +192,8 @@ export default function VentasModule() {
   const sellerInitial = (userInfo?.name || userInfo?.email || 'V').charAt(0).toUpperCase()
   const sellerName = userInfo?.name || userInfo?.email?.split('@')[0] || 'Vendedor'
 
+  const activeMethod = PAYMENT_METHODS.find(m => m.id === paymentMethod)
+
   return (
     <div style={{
       minHeight: '100%',
@@ -106,7 +203,7 @@ export default function VentasModule() {
       padding: '0',
     }}>
 
-      {/* ===== HEADER COMPACTO ===== */}
+      {/* ===== HEADER ===== */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -126,7 +223,7 @@ export default function VentasModule() {
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>Venta Rápida</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Escanear â†’ venta al instante</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Elegí el pago → escaneá</div>
           </div>
         </div>
         {/* Vendedor */}
@@ -149,7 +246,7 @@ export default function VentasModule() {
         </div>
       </div>
 
-      {/* ===== CONTENIDO PRINCIPAL ===== */}
+      {/* ===== CONTENIDO ===== */}
       <div style={{
         flex: 1,
         display: 'flex',
@@ -159,12 +256,195 @@ export default function VentasModule() {
         overflowY: 'auto'
       }}>
 
+        {/* ===== SELECTOR DE MÉTODO DE PAGO ===== */}
+        <div style={{
+          background: 'var(--bg-secondary)',
+          border: `2px solid ${activeMethod ? activeMethod.colorBorder : 'var(--border)'}`,
+          borderRadius: '16px',
+          padding: '16px',
+          transition: 'border-color 0.25s, box-shadow 0.25s',
+          boxShadow: activeMethod ? `0 0 0 3px ${activeMethod.colorSoft}` : 'none'
+        }}>
+          <div style={{
+            fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)',
+            letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px',
+            display: 'flex', alignItems: 'center', gap: '6px'
+          }}>
+            {!paymentMethod && <AlertCircle size={13} color="var(--accent)" />}
+            {paymentMethod ? '✓ Método de pago' : 'Método de pago (obligatorio)'}
+          </div>
+
+          {/* Botones de método */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {PAYMENT_METHODS.map(method => {
+              const isActive = paymentMethod === method.id
+              const Icon = method.icon
+              return (
+                <button
+                  key={method.id}
+                  type="button"
+                  onClick={() => selectPaymentMethod(method.id)}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    height: '58px',
+                    borderRadius: '14px',
+                    border: `2px solid ${isActive ? method.color : 'var(--border)'}`,
+                    background: isActive ? method.colorSoft : 'var(--bg)',
+                    color: isActive ? method.color : 'var(--text-muted)',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.18s',
+                    fontWeight: isActive ? 700 : 500,
+                    fontSize: '0.7rem',
+                    boxShadow: isActive ? `0 4px 14px ${method.colorSoft}` : 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    transform: isActive ? 'scale(1.04)' : 'scale(1)',
+                  }}
+                >
+                  <Icon size={20} />
+                  {method.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Selector de deudor (visible solo cuando method = deudor) */}
+          {paymentMethod === 'deudor' && (
+            <div style={{ marginTop: '12px' }} className="fade-in">
+              <div style={{
+                fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)',
+                letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '6px'
+              }}>
+                Seleccioná el deudor
+              </div>
+              {loadingDebtors ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px' }}>
+                  <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#ef4444' }} />
+                  Cargando deudores...
+                </div>
+              ) : debtors.length === 0 ? (
+                <div style={{
+                  padding: '12px', borderRadius: '10px',
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                  fontSize: '0.8rem', color: 'var(--danger)', display: 'flex', gap: '8px', alignItems: 'center'
+                }}>
+                  <AlertCircle size={14} />
+                  No hay deudores registrados. Creá uno desde el módulo Deudores.
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDebtorDropdownOpen(v => !v)}
+                    style={{
+                      width: '100%', height: '48px', borderRadius: '12px',
+                      border: `2px solid ${selectedDebtor ? 'rgba(239,68,68,0.5)' : 'var(--border)'}`,
+                      background: selectedDebtor ? 'rgba(239,68,68,0.08)' : 'var(--bg)',
+                      color: selectedDebtor ? '#ef4444' : 'var(--text-muted)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0 14px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600,
+                      transition: 'all 0.15s',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <User size={16} />
+                      {selectedDebtor ? selectedDebtor.name : 'Elegir deudor...'}
+                    </div>
+                    <ChevronDown size={16} style={{
+                      transition: 'transform 0.2s',
+                      transform: debtorDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'
+                    }} />
+                  </button>
+
+                  {debtorDropdownOpen && (
+                    <div className="fade-in" style={{
+                      position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                      zIndex: 100,
+                      maxHeight: '220px', overflowY: 'auto'
+                    }}>
+                      {debtors.map(d => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDebtor(d)
+                            setDebtorDropdownOpen(false)
+                            setTimeout(() => barcodeRef.current?.focus(), 100)
+                          }}
+                          style={{
+                            width: '100%', textAlign: 'left', padding: '12px 16px',
+                            background: selectedDebtor?.id === d.id ? 'rgba(239,68,68,0.1)' : 'transparent',
+                            border: 'none', cursor: 'pointer', display: 'flex',
+                            alignItems: 'center', justifyContent: 'space-between',
+                            borderBottom: '1px solid var(--border)',
+                            color: 'var(--text-primary)', fontSize: '0.88rem',
+                            transition: 'background 0.12s',
+                            WebkitTapHighlightColor: 'transparent'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+                          onMouseLeave={e => e.currentTarget.style.background = selectedDebtor?.id === d.id ? 'rgba(239,68,68,0.1)' : 'transparent'}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '28px', height: '28px', borderRadius: '50%',
+                              background: 'rgba(239,68,68,0.15)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#ef4444', fontWeight: 700, fontSize: '0.75rem', flexShrink: 0
+                            }}>
+                              {d.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{d.name}</div>
+                              {d.phone && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{d.phone}</div>}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: '0.78rem', color: '#ef4444', fontWeight: 700 }}>
+                              ${Number(d.total_debt || 0).toLocaleString('es-AR')}
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>deuda actual</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Deudor seleccionado: confirmación visual */}
+              {selectedDebtor && (
+                <div className="fade-in" style={{
+                  marginTop: '8px', padding: '8px 12px',
+                  background: 'rgba(239,68,68,0.1)', borderRadius: '10px',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  fontSize: '0.8rem', color: '#ef4444'
+                }}>
+                  <User size={13} />
+                  <span>Cargando a <strong>{selectedDebtor.name}</strong> · Deuda actual: <strong>${Number(selectedDebtor.total_debt || 0).toLocaleString('es-AR')}</strong></span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* ===== CANTIDAD ===== */}
         <div style={{
           background: 'var(--bg-secondary)',
-          border: '1px solid var(--border)',
+          border: `1px solid ${canScan ? 'var(--border)' : 'var(--border)'}`,
           borderRadius: '16px',
           padding: '16px',
+          opacity: canScan ? 1 : 0.5,
+          transition: 'opacity 0.2s',
+          pointerEvents: canScan ? 'auto' : 'none'
         }}>
           <div style={{
             fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)',
@@ -176,7 +456,7 @@ export default function VentasModule() {
             <button
               type="button"
               onClick={() => adjustQty(-1)}
-              disabled={quantity <= 1 || loading}
+              disabled={quantity <= 1 || loading || !canScan}
               style={{
                 width: '58px', height: '58px', borderRadius: '14px',
                 background: quantity <= 1 ? 'var(--bg-tertiary)' : 'var(--bg-card)',
@@ -197,7 +477,7 @@ export default function VentasModule() {
               max="999"
               value={quantity}
               onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              disabled={loading}
+              disabled={loading || !canScan}
               inputMode="numeric"
               pattern="[0-9]*"
               style={{
@@ -218,12 +498,12 @@ export default function VentasModule() {
             <button
               type="button"
               onClick={() => adjustQty(1)}
-              disabled={loading}
+              disabled={loading || !canScan}
               style={{
                 width: '58px', height: '58px', borderRadius: '14px',
                 background: 'var(--accent)',
                 border: '2px solid var(--accent)',
-                cursor: 'pointer',
+                cursor: !canScan ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#0f1117', flexShrink: 0, transition: 'all 0.15s',
                 WebkitTapHighlightColor: 'transparent',
@@ -233,22 +513,20 @@ export default function VentasModule() {
               <Plus size={22} />
             </button>
           </div>
-          <p style={{
-            fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px',
-            textAlign: 'center', lineHeight: 1.4
-          }}>
-            Ajustá antes de escanear · o escaneá <strong style={{ color: 'var(--text-secondary)' }}>N veces</strong> para N unidades
-          </p>
         </div>
 
         {/* ===== CÓDIGO DE BARRAS ===== */}
         <div style={{
           background: 'var(--bg-secondary)',
-          border: `2px solid ${loading ? 'var(--accent)' : 'var(--border)'}`,
+          border: `2px solid ${
+            !canScan ? 'var(--border)' :
+            loading ? 'var(--accent)' : 'var(--border)'
+          }`,
           borderRadius: '16px',
           padding: '16px',
-          transition: 'border-color 0.2s',
-          boxShadow: loading ? '0 0 0 3px var(--accent-soft)' : 'none'
+          transition: 'border-color 0.2s, opacity 0.2s, box-shadow 0.2s',
+          boxShadow: loading ? '0 0 0 3px var(--accent-soft)' : 'none',
+          position: 'relative'
         }}>
           <div style={{
             fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)',
@@ -256,6 +534,26 @@ export default function VentasModule() {
           }}>
             Código de Barras
           </div>
+
+          {/* Overlay de bloqueo */}
+          {!canScan && (
+            <div style={{
+              position: 'absolute', inset: 0, borderRadius: '14px',
+              background: 'rgba(15,17,23,0.6)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: '8px', zIndex: 10
+            }}>
+              <AlertCircle size={28} color="var(--accent)" />
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', textAlign: 'center', padding: '0 20px' }}>
+                {paymentMethod === 'deudor' && !selectedDebtor
+                  ? 'Elegí un deudor para continuar'
+                  : 'Seleccioná el método de pago primero'}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleBarcodeSubmit}>
             <div style={{ position: 'relative' }}>
               <Barcode size={18} style={{
@@ -268,7 +566,7 @@ export default function VentasModule() {
                 value={barcodeInput}
                 onChange={e => setBarcodeInput(e.target.value)}
                 placeholder="Escanear o escribir código..."
-                disabled={loading}
+                disabled={loading || !canScan}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="none"
@@ -291,13 +589,15 @@ export default function VentasModule() {
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
               <button
                 type="submit"
-                disabled={!barcodeInput.trim() || loading}
+                disabled={!barcodeInput.trim() || loading || !canScan}
                 style={{
                   flex: 1, height: '48px', borderRadius: '12px',
-                  background: barcodeInput.trim() && !loading ? 'var(--accent)' : 'var(--bg-tertiary)',
-                  color: barcodeInput.trim() && !loading ? '#0f1117' : 'var(--text-muted)',
+                  background: barcodeInput.trim() && !loading && canScan
+                    ? (activeMethod?.color || 'var(--accent)')
+                    : 'var(--bg-tertiary)',
+                  color: barcodeInput.trim() && !loading && canScan ? '#0f1117' : 'var(--text-muted)',
                   border: 'none', fontWeight: 700, fontSize: '0.9rem',
-                  cursor: barcodeInput.trim() && !loading ? 'pointer' : 'not-allowed',
+                  cursor: barcodeInput.trim() && !loading && canScan ? 'pointer' : 'not-allowed',
                   transition: 'all 0.2s',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   WebkitTapHighlightColor: 'transparent'
@@ -314,13 +614,52 @@ export default function VentasModule() {
                   </>
                 )}
               </button>
-
             </div>
           </form>
           <div style={{ marginTop: '16px' }}>
-            <BarcodeScanner onScan={handleScan} active={!loading} showCamera={false} inline={true} autoStart={true} />
+            <BarcodeScanner
+              onScan={handleScan}
+              active={!loading && canScan}
+              showCamera={false}
+              inline={true}
+              autoStart={true}
+            />
           </div>
         </div>
+
+        {/* Status bar: método activo */}
+        {paymentMethod && (
+          <div className="fade-in" style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '10px 14px',
+            background: activeMethod.colorSoft,
+            border: `1px solid ${activeMethod.colorBorder}`,
+            borderRadius: '12px',
+            fontSize: '0.8rem'
+          }}>
+            <div style={{ color: activeMethod.color, display: 'flex', gap: '6px', alignItems: 'center', fontWeight: 600 }}>
+              {React.createElement(activeMethod.icon, { size: 14 })}
+              {activeMethod.label}
+              {selectedDebtor && <span> · {selectedDebtor.name}</span>}
+            </div>
+            <div style={{ flex: 1 }} />
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.73rem' }}>
+              {canScan ? '✓ Listo para escanear' : 'Elegí un deudor'}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setPaymentMethod(null); setSelectedDebtor(null) }}
+              style={{
+                background: 'none', border: '1px solid var(--border)',
+                borderRadius: '6px', padding: '2px 8px',
+                color: 'var(--text-muted)', cursor: 'pointer',
+                fontSize: '0.72rem', lineHeight: 1.4
+              }}
+            >
+              Cambiar
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -328,15 +667,11 @@ export default function VentasModule() {
           from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        /* En mobile: input de cantidad sin flechas */
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
         input[type=number] { -moz-appearance: textfield; }
-        /* Touch feedback */
         button:active { opacity: 0.8; transform: scale(0.97); }
       `}</style>
     </div>
   )
 }
-
-
