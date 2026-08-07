@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   dbGetProductByBarcode, dbCreateSale, dbLogActivity,
@@ -162,9 +162,10 @@ export default function VentasModule() {
     setPaymentMethod(method)
     setSelectedDebtor(null)
     setDebtorDropdownOpen(false)
-    // Focus en barcode si no es deudor o ya tiene deudor
-    if (method !== 'deudor') {
-      setTimeout(() => barcodeRef.current?.focus(), 100)
+    // NO hacer focus en móvil: dispara teclado y conflictos visuales
+    // Solo hacer focus en desktop (dispositivos con mouse/keyboard)
+    if (method !== 'deudor' && window.matchMedia('(hover: hover)').matches) {
+      setTimeout(() => barcodeRef.current?.focus(), 150)
     }
   }
 
@@ -723,13 +724,13 @@ export default function VentasModule() {
               active={!loading && canScan}
               showCamera={false}
               inline={true}
-              autoStart={true}
+              autoStart={false}
             />
           </div>
         </div>
 
         {/* Status bar: método activo */}
-        {paymentMethod && (
+        {paymentMethod && activeMethod && (
           <div className="fade-in" style={{
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '10px 14px',
@@ -739,7 +740,9 @@ export default function VentasModule() {
             fontSize: '0.8rem'
           }}>
             <div style={{ color: activeMethod.color, display: 'flex', gap: '6px', alignItems: 'center', fontWeight: 600 }}>
-              {React.createElement(activeMethod.icon, { size: 14 })}
+              <span style={{ fontSize: '0.9rem' }}>
+                {paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : '📒'}
+              </span>
               {activeMethod.label}
               {selectedDebtor && <span> · {selectedDebtor.name}</span>}
             </div>
