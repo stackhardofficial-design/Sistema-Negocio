@@ -42,14 +42,19 @@ function formatMoney(n) {
 
 function renderDetails(details) {
   if (!details || Object.keys(details).length === 0) return '—'
-  
+
+  const PAYMENT_LABELS = {
+    efectivo: '💵 Efectivo',
+    transferencia: '📲 Mercado Pago',
+    deudor: '📒 Deudor'
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {Object.entries(details).map(([k, v]) => {
-        // Translation and formatting for common keys
         let keyLabel = k
         let valStr = String(v)
-        
+
         if (k === 'name' || k === 'product') keyLabel = 'Nombre'
         if (k === 'barcode') keyLabel = 'Cód. Barras'
         if (k === 'price' || k === 'unit_price') { keyLabel = 'Precio'; valStr = formatMoney(v) }
@@ -63,10 +68,18 @@ function renderDetails(details) {
         if (k === 'status') keyLabel = 'Estado'
         if (k === 'items') keyLabel = 'Cant. Items'
         if (k === 'category_id') keyLabel = 'Categoría ID'
+        if (k === 'payment_method') {
+          keyLabel = 'Método de pago'
+          valStr = PAYMENT_LABELS[v] || v
+        }
+        if (k === 'debtor') {
+          keyLabel = 'Deudor'
+          valStr = v ? `📒 ${v}` : '—'
+        }
 
         // Skip printing raw objects if they somehow get in
         if (typeof v === 'object') return null
-        
+
         return (
           <div key={k} style={{ display: 'flex', gap: '6px', alignItems: 'baseline' }}>
             <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{keyLabel}:</span>

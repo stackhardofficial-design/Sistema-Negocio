@@ -166,6 +166,11 @@ export default function FinanzasModule() {
   const totalVariables = expenses.filter(e => !e.expense_type || e.expense_type === 'variable').reduce((acc, e) => acc + Number(e.amount), 0)
   const gananciaNeta = totalIngresos - totalGastos
 
+  // Desglose de ingresos por método de pago
+  const ingresoEfectivo = salesSummary.filter(s => !s.payment_method || s.payment_method === 'efectivo').reduce((a, s) => a + Number(s.total_amount), 0)
+  const ingresoTransferencia = salesSummary.filter(s => s.payment_method === 'transferencia').reduce((a, s) => a + Number(s.total_amount), 0)
+  const ingresoDeudor = salesSummary.filter(s => s.payment_method === 'deudor').reduce((a, s) => a + Number(s.total_amount), 0)
+
   // Agrupar para planilla semanal
   // Filas: Categorías, Columnas: Fechas únicas en el rango (o últimos 7 días)
   const fechasUnicas = [...new Set(expenses.map(e => e.expense_date))].sort()
@@ -351,6 +356,39 @@ export default function FinanzasModule() {
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay gastos en este periodo.</p>
                   )}
                 </div>
+
+                {/* Desglose de ingresos por método de pago */}
+                {totalIngresos > 0 && (
+                  <div className="card" style={{ marginTop: '0' }}>
+                    <h3 style={{ marginBottom: '16px', fontSize: '1rem' }}>Ingresos por método de pago</h3>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {[
+                        { label: '💵 Efectivo', value: ingresoEfectivo, color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' },
+                        { label: '📲 Mercado Pago', value: ingresoTransferencia, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)' },
+                        { label: '📒 Deudor (fiado)', value: ingresoDeudor, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)' },
+                      ].map(m => (
+                        <div key={m.label} style={{
+                          flex: 1, minWidth: '140px',
+                          padding: '14px 16px', borderRadius: '12px',
+                          background: m.bg, border: `1px solid ${m.border}`
+                        }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 600, color: m.color, marginBottom: '6px' }}>{m.label}</div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: m.color }}>{formatMoney(m.value)}</div>
+                          {totalIngresos > 0 && (
+                            <div style={{ marginTop: '6px' }}>
+                              <div style={{ width: '100%', height: '4px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden' }}>
+                                <div style={{ width: `${(m.value / totalIngresos) * 100}%`, height: '100%', background: m.color, transition: 'width 0.4s' }} />
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                                {((m.value / totalIngresos) * 100).toFixed(1)}% del total
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

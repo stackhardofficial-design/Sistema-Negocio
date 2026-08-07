@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { sb, dbGetSales, dbGetProducts } from '../../lib/supabase'
+import { sb, dbGetSales, dbGetProducts, dbGetDebtors } from '../../lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -22,6 +22,7 @@ export default function DashboardModule() {
   const [loading, setLoading] = useState(true)
   const [sales, setSales] = useState([])
   const [products, setProducts] = useState([])
+  const [debtors, setDebtors] = useState([])
   const [refreshing, setRefreshing] = useState(false)
   
   // Filtros de tiempo
@@ -60,16 +61,18 @@ export default function DashboardModule() {
     const fetchFrom = fromDate < today ? fromDate : today
 
     try {
-      const [s, p] = await Promise.all([
+      const [s, p, d] = await Promise.all([
         dbGetSales(tenantId, { 
           dateFrom: fetchFrom.toISOString(), 
           dateTo: (timeFilter === 'custom' && customTo) ? toDate.toISOString() : undefined,
           status: 'completed' 
         }),
-        dbGetProducts(tenantId)
+        dbGetProducts(tenantId),
+        dbGetDebtors(tenantId, { includeSettled: false })
       ])
       setSales(s)
       setProducts(p)
+      setDebtors(d)
     } catch (err) {
       console.error('Error cargando dashboard', err)
     } finally {
@@ -101,6 +104,12 @@ export default function DashboardModule() {
   const totalGananciaHoy = todaySales.reduce((acc, s) => acc + ((s.total_amount || 0) - (s.total_cost || 0)), 0)
   const totalTransacciones = todaySales.length
   const lowStockProducts = products.filter(p => p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock)
+
+  // Desglose de ventas de hoy por método de pago
+  const ventasEfectivo = todaySales.filter(s => !s.payment_method || s.payment_method === 'efectivo').reduce((a, s) => a + (s.total_amount || 0), 0)
+  const ventasTransferencia = todaySales.filter(s => s.payment_method === 'transferencia').reduce((a, s) => a + (s.total_amount || 0), 0)
+  const ventasDeudor = todaySales.filter(s => s.payment_method === 'deudor').reduce((a, s) => a + (s.total_amount || 0), 0)
+  const totalDeudaActiva = debtors.filter(d => !d.is_settled).reduce((a, d) => a + (d.total_debt || 0), 0)
 
   // ===== Filtrar ventas según el rango elegido (para los gráficos) =====
   let filteredSales = sales
@@ -289,6 +298,17 @@ export default function DashboardModule() {
             <div className="kpi-sub">Por transacción</div>
           </div>
 
+          <div className="kpi-card" style={{ borderColor: totalDeudaActiva > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border)' }}>
+            <div className="kpi-icon" style={{ background: totalDeudaActiva > 0 ? 'var(--danger-soft)' : 'var(--bg-tertiary)', color: totalDeudaActiva > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+              <BarChart2 size={20} />
+            </div>
+            <div className="kpi-label">Deuda activa</div>
+            <div className="kpi-value" style={{ color: totalDeudaActiva > 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
+              {formatMoney(totalDeudaActiva)}
+            </div>
+            <div className="kpi-sub">{debtors.filter(d => !d.is_settled).length} deudores</div>
+          </div>
+
           <div className="kpi-card" style={{ borderColor: lowStockProducts.length > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border)' }}>
             <div className="kpi-icon" style={{ background: lowStockProducts.length > 0 ? 'var(--danger-soft)' : 'var(--bg-tertiary)', color: lowStockProducts.length > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
               <AlertTriangle size={20} />
@@ -300,6 +320,36 @@ export default function DashboardModule() {
             <div className="kpi-sub">productos</div>
           </div>
         </div>
+
+        {/* Desglose por método de pago (hoy) */}
+        {totalTransacciones > 0 && (
+          <div className="card fade-in" style={{ padding: '16px 20px' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '14px' }}>
+              Desglose hoy por método de pago
+            </div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {[
+                { label: '💵 Efectivo', value: ventasEfectivo, color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' },
+                { label: '📲 Mercado Pago', value: ventasTransferencia, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)' },
+                { label: '📒 Deudor', value: ventasDeudor, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)' },
+              ].map(m => (
+                <div key={m.label} style={{
+                  flex: 1, minWidth: '120px',
+                  padding: '12px 16px', borderRadius: '12px',
+                  background: m.bg, border: `1px solid ${m.border}`
+                }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: m.color, marginBottom: '4px' }}>{m.label}</div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: m.color }}>{formatMoney(m.value)}</div>
+                  {totalVentaHoy > 0 && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {((m.value / totalVentaHoy) * 100).toFixed(0)}% del total
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Charts Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
