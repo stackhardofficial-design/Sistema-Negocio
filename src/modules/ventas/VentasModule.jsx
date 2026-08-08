@@ -186,7 +186,26 @@ export default function VentasModule() {
   const quantityRef = useRef(quantity)
   const [loading, setLoading] = useState(false)
   const [flashSuccess, setFlashSuccess] = useState(false)
+  const [scanCooldown, setScanCooldown] = useState(0)
   const barcodeRef = useRef(null)
+
+  // ===== COOLDOWN TIMER =====
+  useEffect(() => {
+    if (scanCooldown > 0) {
+      const timer = setTimeout(() => {
+        if (scanCooldown === 1) {
+          setScanCooldown(0)
+          setLoading(false)
+          if (window.matchMedia('(hover: hover)').matches) {
+            setTimeout(() => barcodeRef.current?.focus(), 150)
+          }
+        } else {
+          setScanCooldown(c => c - 1)
+        }
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [scanCooldown])
 
   // ===== WAKE LOCK (Evitar que se apague la pantalla en móviles) =====
   const wakeLock = useRef(null)
@@ -321,10 +340,8 @@ export default function VentasModule() {
       setQuantity(1)
       setBarcodeInput('')
 
-      // Esperar 2 segundos antes de permitir el próximo escaneo
-      setTimeout(() => {
-        setLoading(false)
-      }, 2000)
+      // Iniciar cooldown visual
+      setScanCooldown(2)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
       setBarcodeInput('')
@@ -772,7 +789,12 @@ export default function VentasModule() {
                   WebkitTapHighlightColor: 'transparent'
                 }}
               >
-                {loading ? (
+                {scanCooldown > 0 ? (
+                  <>
+                    <Loader size={18} className="spin" style={{ color: 'var(--accent)' }} />
+                    Volver a escanear en {scanCooldown}...
+                  </>
+                ) : loading ? (
                   <>
                     <div className="spinner" style={{ width: '18px', height: '18px', borderTopColor: 'var(--accent)' }} />
                     Registrando...
