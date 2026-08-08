@@ -28,12 +28,7 @@ function isValidUPCA(code) {
 
 function isValidBarcode(code) {
   if (!code || code.length < 3) return false
-  // EAN-13, EAN-8, UPC-A: validar checksum
-  if (code.length === 13) return isValidEAN13(code)
-  if (code.length === 8) return isValidEAN8(code)
-  if (code.length === 12) return isValidUPCA(code)
-  // CODE-128, CODE-39 u otros: aceptar si son alfanuméricos de largo razonable
-  return /^[A-Za-z0-9\-._]+$/.test(code) && code.length >= 3
+  return /^[A-Za-z0-9\-._]+$/.test(code)
 }
 
 // ── Detectar soporte nativo de BarcodeDetector (Chrome Android) ──
