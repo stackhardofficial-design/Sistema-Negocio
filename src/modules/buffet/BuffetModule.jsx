@@ -328,7 +328,7 @@ export default function BuffetModule() {
         await dbAddDebtorCharge(selectedDebtor.id, total, `Buffet: ${qty}x ${bp.name}`, [{
           buffet_product_id: bp.id, product_name: bp.name, barcode: bp.barcode,
           quantity: qty, unit_price: bp.price, subtotal: total
-        }])
+        }], sale.id)
       }
 
       // 3. Create Buffet Order (Kitchen)

@@ -276,7 +276,8 @@ export default function VentasModule() {
           selectedDebtor.id,
           total,
           `Venta: ${qty}x ${product.name}`,
-          chargeItems
+          chargeItems,
+          sale.id
         )
       }
 

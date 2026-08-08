@@ -319,26 +319,55 @@ export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCo
 export async function dbCancelSale(saleId, userId, reason) {
   // Primero obtener los items para restaurar stock
   const { data: items } = await sb.from('sale_items')
-    .select('product_id, quantity')
+    .select('product_id, quantity, buffet_product_id')
     .eq('sale_id', saleId)
 
   // Marcar como cancelada
-  const { data, error } = await sb.from('sales')
+  const { data: sale, error } = await sb.from('sales')
     .update({ status: 'cancelled', cancel_reason: reason, cancelled_by: userId, cancelled_at: new Date().toISOString() })
     .eq('id', saleId).select().single()
   if (error) throw error
 
-  // Restaurar stock: pasar cantidad negativa a decrement_stock (lo suma de vuelta)
+  // Restaurar stock
   if (items && items.length > 0) {
     for (const item of items) {
       if (item.product_id) {
-        const { error: rpcErr } = await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
-        if (rpcErr) console.error('Error restoring stock:', rpcErr)
+        // Restaurar kiosco
+        await sb.rpc('decrement_stock', { p_product_id: item.product_id, p_qty: -item.quantity })
+      } else if (item.buffet_product_id) {
+        // Restaurar buffet
+        const { data: bp } = await sb.from('buffet_products').select('stock, is_composite, buffet_product_components(quantity, component_product_id, component_buffet_product_id)').eq('id', item.buffet_product_id).single()
+        if (bp) {
+          if (!bp.is_composite && bp.stock !== null) {
+            await sb.from('buffet_products').update({ stock: bp.stock + item.quantity }).eq('id', item.buffet_product_id)
+          } else if (bp.is_composite) {
+            // Restaurar componentes
+            for (const comp of (bp.buffet_product_components || [])) {
+              const reqQty = comp.quantity * item.quantity
+              if (comp.component_product_id) {
+                await sb.rpc('decrement_stock', { p_product_id: comp.component_product_id, p_qty: -reqQty })
+              } else if (comp.component_buffet_product_id) {
+                const { data: childBp } = await sb.from('buffet_products').select('stock').eq('id', comp.component_buffet_product_id).single()
+                if (childBp && childBp.stock !== null) {
+                  await sb.from('buffet_products').update({ stock: childBp.stock + reqQty }).eq('id', comp.component_buffet_product_id)
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
 
-  return data
+  // Eliminar el cargo al deudor si la venta había sido fiada
+  if (sale.debtor_id) {
+    const { error: delErr } = await sb.from('debtor_charges').delete().eq('sale_id', saleId)
+    if (!delErr) {
+      await sb.rpc('update_debtor_total', { p_debtor_id: sale.debtor_id })
+    }
+  }
+
+  return sale
 }
 
 export async function dbMarkAutoconsumo(saleId) {
@@ -562,9 +591,9 @@ export async function dbCreateDebtor(tenantId, payload) {
   return data
 }
 
-export async function dbAddDebtorCharge(debtorId, amount, note, items = []) {
+export async function dbAddDebtorCharge(debtorId, amount, note, items = [], saleId = null) {
   const { data, error } = await sb.from('debtor_charges')
-    .insert({ debtor_id: debtorId, amount, note, items }).select().single()
+    .insert({ debtor_id: debtorId, amount, note, items, sale_id: saleId }).select().single()
   if (error) throw error
   // Update total
   await sb.rpc('update_debtor_total', { p_debtor_id: debtorId })
