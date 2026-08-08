@@ -1,25 +1,66 @@
-import { useState, useRef, useEffect, useId } from 'react'
+import { useState, useRef, useEffect, useId, useCallback } from 'react'
 import { Camera, X, Loader } from 'lucide-react'
 
+// ── Validación de checksums para evitar lecturas erróneas ──
+function isValidEAN13(code) {
+  if (!/^\d{13}$/.test(code)) return false
+  const digits = code.split('').map(Number)
+  const check = digits.pop()
+  const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 1 : 3), 0)
+  return (10 - (sum % 10)) % 10 === check
+}
+
+function isValidEAN8(code) {
+  if (!/^\d{8}$/.test(code)) return false
+  const digits = code.split('').map(Number)
+  const check = digits.pop()
+  const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0)
+  return (10 - (sum % 10)) % 10 === check
+}
+
+function isValidUPCA(code) {
+  if (!/^\d{12}$/.test(code)) return false
+  const digits = code.split('').map(Number)
+  const check = digits.pop()
+  const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0)
+  return (10 - (sum % 10)) % 10 === check
+}
+
+function isValidBarcode(code) {
+  if (!code || code.length < 3) return false
+  // EAN-13, EAN-8, UPC-A: validar checksum
+  if (code.length === 13) return isValidEAN13(code)
+  if (code.length === 8) return isValidEAN8(code)
+  if (code.length === 12) return isValidUPCA(code)
+  // CODE-128, CODE-39 u otros: aceptar si son alfanuméricos de largo razonable
+  return /^[A-Za-z0-9\-._]+$/.test(code) && code.length >= 3
+}
+
+// ── Detectar soporte nativo de BarcodeDetector (Chrome Android) ──
+const hasNativeBarcodeDetector = typeof globalThis.BarcodeDetector !== 'undefined'
+
 /**
- * BarcodeScanner - usa html5-qrcode (que funciona) con config de máxima velocidad
+ * BarcodeScanner ultra-rápido
+ * - Android/Chrome: usa BarcodeDetector nativo (instantáneo)
+ * - iPhone/Safari: usa @zxing/browser (mucho más rápido que html5-qrcode en iOS)
+ * - Valida checksums para evitar lecturas erróneas
  */
 export default function BarcodeScanner({ onScan, active = true, showCamera = false, inline = false, autoStart = false }) {
   const [scanning, setScanning] = useState(false)
-  const [cameraOpen, setCameraOpen] = useState(autoStart)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [error, setError] = useState('')
+  const uid = useId().replace(/:/g, '')
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const animFrameRef = useRef(null)
+  const stoppedRef = useRef(false)
+
+  const latestOnScan = useRef(onScan)
+  useEffect(() => { latestOnScan.current = onScan }, [onScan])
 
   useEffect(() => {
     if (autoStart) setCameraOpen(true)
   }, [autoStart])
-  const [error, setError] = useState('')
-  const scannerRef = useRef(null)
-  const uid = useId().replace(/:/g, '')
-  const containerId = `barcode-reader-${uid}`
-
-  const latestOnScan = useRef(onScan)
-  useEffect(() => {
-    latestOnScan.current = onScan
-  }, [onScan])
 
   // ===== LECTOR FÍSICO (USB HID) =====
   useEffect(() => {
@@ -43,103 +84,182 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
     return () => window.removeEventListener('keydown', handleKey)
   }, [active])
 
-  async function handleScanned(barcode) {
+  const handleScanned = useCallback(async (barcode) => {
+    const code = barcode.trim()
+    if (!isValidBarcode(code)) return // Descartar lecturas erróneas silenciosamente
     setScanning(true)
-    try { await latestOnScan.current(barcode.trim()) } finally { setScanning(false) }
-  }
+    try { await latestOnScan.current(code) } finally { setScanning(false) }
+  }, [])
 
   // ===== CÁMARA =====
-  async function openCamera() {
+  function openCamera() {
     setError('')
     setCameraOpen(true)
   }
 
+  async function closeCamera() {
+    stoppedRef.current = true
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+    }
+    setCameraOpen(false)
+    setError('')
+  }
+
   useEffect(() => {
     if (!cameraOpen) return
-
-    let html5QrCode = null
-    let stopped = false
+    stoppedRef.current = false
+    let lastCode = ''
+    let lastScanTime = 0
+    let confirmBuffer = '' // Requiere 2 lecturas iguales consecutivas para aceptar
+    let confirmCount = 0
 
     const start = async () => {
       try {
-        const { Html5Qrcode } = await import('html5-qrcode')
-        if (stopped) return
-
-        let lastCode = ''
-        let lastScanTime = 0
-
-        html5QrCode = new Html5Qrcode(containerId)
-        scannerRef.current = html5QrCode
-
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          {
-            fps: 15,
-            aspectRatio: 1.0,
-            experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true
-            },
-            disableFlip: true,
-            // EAN_13=9, EAN_8=10, UPC_A=14, CODE_128=5, CODE_39=3
-            formatsToSupport: [9, 10, 14, 5, 3]
+        // Pedir la cámara con resolución ideal para escaneo rápido
+        const constraints = {
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            // Safari no soporta frameRate constraint pero no falla
+            frameRate: { ideal: 30, min: 15 }
           },
-          async (code) => {
-            if (stopped) return
-            const now = Date.now()
-            if (code === lastCode && now - lastScanTime < 1500) return // debounce same code
-            lastCode = code
-            lastScanTime = now
-            
-            if (!inline) {
-              stopped = true
-              await stop()
-              setCameraOpen(false)
+          audio: false
+        }
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        if (stoppedRef.current) { stream.getTracks().forEach(t => t.stop()); return }
+        streamRef.current = stream
+
+        const video = videoRef.current
+        if (!video) { stream.getTracks().forEach(t => t.stop()); return }
+        video.srcObject = stream
+        video.setAttribute('playsinline', 'true') // Crítico para iOS
+        video.setAttribute('autoplay', 'true')
+        await video.play()
+
+        if (stoppedRef.current) return
+
+        if (hasNativeBarcodeDetector) {
+          // ── MOTOR NATIVO (Android/Chrome) ── instantáneo
+          const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'code_128', 'code_39'] })
+
+          const scanLoop = async () => {
+            if (stoppedRef.current) return
+            try {
+              const barcodes = await detector.detect(video)
+              for (const bc of barcodes) {
+                const code = bc.rawValue
+                if (!code || !isValidBarcode(code)) continue
+                const now = Date.now()
+                if (code === lastCode && now - lastScanTime < 1500) continue
+                // Confirmación rápida: 2 lecturas iguales
+                if (code === confirmBuffer) {
+                  confirmCount++
+                } else {
+                  confirmBuffer = code
+                  confirmCount = 1
+                }
+                if (confirmCount >= 2) {
+                  lastCode = code
+                  lastScanTime = now
+                  confirmBuffer = ''
+                  confirmCount = 0
+                  if (!inline) {
+                    stoppedRef.current = true
+                    closeCamera()
+                  }
+                  await handleScanned(code)
+                  return
+                }
+              }
+            } catch {}
+            // ~30 fps loop
+            animFrameRef.current = requestAnimationFrame(scanLoop)
+          }
+          animFrameRef.current = requestAnimationFrame(scanLoop)
+
+        } else {
+          // ── MOTOR ZXING (iPhone/Safari) ── mucho más rápido que html5-qrcode
+          const { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } = await import('@zxing/library')
+          if (stoppedRef.current) return
+
+          const hints = new Map()
+          hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13,
+            BarcodeFormat.EAN_8,
+            BarcodeFormat.UPC_A,
+            BarcodeFormat.CODE_128,
+            BarcodeFormat.CODE_39
+          ])
+          hints.set(DecodeHintType.TRY_HARDER, false) // Más rápido sin TRY_HARDER
+
+          const reader = new BrowserMultiFormatReader(hints, 80) // 80ms entre intentos = ~12fps
+
+          const scanLoop = async () => {
+            if (stoppedRef.current) return
+            try {
+              const result = await reader.decodeOnce(video)
+              if (result) {
+                const code = result.getText()
+                if (code && isValidBarcode(code)) {
+                  const now = Date.now()
+                  if (code !== lastCode || now - lastScanTime >= 1500) {
+                    // Confirmación: 2 lecturas iguales
+                    if (code === confirmBuffer) {
+                      confirmCount++
+                    } else {
+                      confirmBuffer = code
+                      confirmCount = 1
+                    }
+                    if (confirmCount >= 2) {
+                      lastCode = code
+                      lastScanTime = now
+                      confirmBuffer = ''
+                      confirmCount = 0
+                      if (!inline) {
+                        stoppedRef.current = true
+                        closeCamera()
+                      }
+                      await handleScanned(code)
+                      return
+                    }
+                  }
+                }
+              }
+            } catch {}
+            if (!stoppedRef.current) {
+              // Siguiente frame rápido
+              animFrameRef.current = requestAnimationFrame(scanLoop)
             }
-            await handleScanned(code)
-          },
-          () => {}
-        )
+          }
+          animFrameRef.current = requestAnimationFrame(scanLoop)
+        }
+
       } catch (err) {
         console.error('Scanner start error:', err)
-        if (!stopped) {
+        if (!stoppedRef.current) {
           setError('No se pudo iniciar la cámara. Verificá los permisos.')
           setCameraOpen(false)
         }
       }
     }
 
-    const stop = async () => {
-      if (html5QrCode) {
-        try {
-          const state = html5QrCode.getState()
-          if (state === 2) await html5QrCode.stop()
-        } catch {}
-        html5QrCode = null
-        scannerRef.current = null
-      }
-    }
-
-    const t = setTimeout(start, 150)
+    // Start con delay mínimo para que el DOM monte el <video>
+    const t = setTimeout(start, 50)
 
     return () => {
       clearTimeout(t)
-      stopped = true
-      stop()
+      stoppedRef.current = true
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
     }
-  }, [cameraOpen, containerId])
-
-  async function closeCamera() {
-    const sc = scannerRef.current
-    if (sc) {
-      try {
-        const state = sc.getState()
-        if (state === 2) await sc.stop()
-      } catch {}
-      scannerRef.current = null
-    }
-    setCameraOpen(false)
-    setError('')
-  }
+  }, [cameraOpen, inline, handleScanned])
 
   return (
     <>
@@ -149,7 +269,7 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
           color: 'var(--accent)', fontSize: '0.8rem', padding: '4px 10px',
           background: 'var(--accent-soft)', borderRadius: '20px'
         }}>
-          <Loader size={14} className="spin-anim" /> Buscando...
+          <Loader size={14} className="spin-anim" /> Registrando...
         </div>
       )}
 
@@ -181,16 +301,16 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
                 setError('')
                 setCameraOpen(true)
               } catch (e) {
-                alert('La cámara sigue bloqueada por tu teléfono. En iPhone: ve a Configuración > Safari > Cámara, y ponlo en "Permitir" o "Preguntar". Si usas una app instalada, puede que debas reinstalarla tras dar el permiso en Safari.')
+                alert('La cámara sigue bloqueada. En iPhone: Configuración > Safari > Cámara > Permitir.')
               }
             }}
           >
-            <Camera size={14} /> Dar permiso manual
+            <Camera size={14} /> Reintentar
           </button>
         </div>
       )}
 
-      {/* Modal del escáner */}
+      {/* Video del escáner */}
       {cameraOpen && (
         <div style={inline ? {
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%'
@@ -211,11 +331,31 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
             </p>
           )}
 
-          {/* Contenedor donde html5-qrcode renderiza el video */}
-          <div
-            id={containerId}
-            style={{ width: '100%', maxWidth: '500px', borderRadius: '12px', overflow: 'hidden', background: inline ? 'var(--bg)' : 'transparent' }}
-          />
+          {/* Video directo: mucho más rápido que el render de html5-qrcode */}
+          <div style={{
+            width: '100%', maxWidth: '500px', borderRadius: '12px', overflow: 'hidden',
+            background: inline ? 'var(--bg)' : '#000', position: 'relative'
+          }}>
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              autoPlay
+              style={{
+                width: '100%', display: 'block', borderRadius: '12px',
+                objectFit: 'cover', maxHeight: inline ? '200px' : '400px'
+              }}
+            />
+            {/* Guía visual de escaneo */}
+            <div style={{
+              position: 'absolute', top: '50%', left: '10%', right: '10%',
+              height: '2px', background: 'var(--accent)',
+              transform: 'translateY(-50%)',
+              boxShadow: '0 0 8px var(--accent), 0 0 20px var(--accent)',
+              opacity: 0.8,
+              animation: 'scanLine 1.5s ease-in-out infinite alternate'
+            }} />
+          </div>
 
           {!inline && (
             <button onClick={closeCamera} className="btn btn-danger" style={{ marginTop: '8px' }}>
@@ -228,15 +368,9 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
       <style>{`
         .spin-anim { animation: _spin 1s linear infinite; }
         @keyframes _spin { to { transform: rotate(360deg); } }
-
-        /* Ocultar controles innecesarios de html5-qrcode */
-        #${containerId} select,
-        #${containerId} img:not([src*="camera"]),
-        #${containerId} span:empty {
-          display: none !important;
-        }
-        #${containerId} video {
-          border-radius: 10px;
+        @keyframes scanLine {
+          0% { top: 35%; opacity: 0.5; }
+          100% { top: 65%; opacity: 1; }
         }
       `}</style>
     </>
