@@ -315,7 +315,7 @@ export default function VentasModule() {
       setFlashSuccess(true)
       setTimeout(() => setFlashSuccess(false), 300)
 
-      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : `📒 ${selectedDebtor.name}`
+      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : paymentMethod === 'multipagos' ? '💳 Multipagos' : `📒 ${selectedDebtor?.name || ''}`
       toast(`${qty}x ${product.name} · ${formatMoney(total)} · ${methodLabel}`, 'success')
 
       setQuantity(1)
