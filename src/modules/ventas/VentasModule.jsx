@@ -7,7 +7,7 @@ import {
 import BarcodeScanner from '../../components/BarcodeScanner'
 import {
   Barcode, Package, Zap, Minus, Plus,
-  AlertCircle, ChevronDown, User
+  AlertCircle, ChevronDown, User, Loader
 } from 'lucide-react'
 
 function playBeep() {
