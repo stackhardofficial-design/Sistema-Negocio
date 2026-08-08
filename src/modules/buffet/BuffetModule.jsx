@@ -253,7 +253,7 @@ export default function BuffetModule() {
                 <Plus size={16} /> Nuevo pedido
               </button>
             )}
-            {tab === 'productos' && isAdmin() && (
+            {tab === 'productos' && (
               <>
                 <button onClick={openCreate} className="btn btn-primary btn-sm">
                   <Plus size={16} /> Nuevo producto
@@ -280,13 +280,13 @@ export default function BuffetModule() {
                   <th style={{ textAlign: 'right' }}>Costo</th>
                   <th style={{ textAlign: 'right' }}>Stock</th>
                   <th>Tipo</th>
-                  {isAdmin() && <th>Acciones</th>}
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {buffetProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin() ? 7 : 6}>
+                    <td colSpan={7}>
                       <div className="empty-state">
                         <Coffee size={32} />
                         <p>Sin productos en buffet</p>
@@ -321,13 +321,11 @@ export default function BuffetModule() {
                           : <span className="badge badge-neutral" style={{ fontSize: '0.65rem' }}>Simple</span>
                         }
                       </td>
-                      {isAdmin() && (
-                        <td>
-                          <button onClick={() => openEdit(bp)} className="btn btn-secondary btn-sm">
-                            <Edit2 size={12} />
-                          </button>
-                        </td>
-                      )}
+                      <td>
+                        <button onClick={() => openEdit(bp)} className="btn btn-secondary btn-sm">
+                          <Edit2 size={12} />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
