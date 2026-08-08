@@ -451,12 +451,12 @@ export async function dbGetBuffetProducts(tenantId) {
   const { data } = await sb.from('buffet_products')
     .select(`
       *, 
-      buffet_ingredients(*, ingredients(name, stock, cost_price, unit)),
       buffet_product_components!composite_buffet_product_id(
         quantity,
         component_buffet_product_id,
         component_product_id,
-        products(name, cost_price, price, barcode)
+        products(name, cost_price, price, barcode, stock),
+        buffet_products!component_buffet_product_id(name, cost_price, price, barcode, stock)
       )
     `)
     .eq('tenant_id', tenantId).eq('is_active', true).order('name')

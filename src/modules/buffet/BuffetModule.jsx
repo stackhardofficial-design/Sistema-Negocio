@@ -4,7 +4,7 @@ import {
   sb, dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
   dbGetBuffetOrders, dbGetProducts, dbSetBuffetProductComponents,
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity,
-  dbCreateSale, dbGetDebtors, dbAddDebtorCharge
+  dbCreateSale, dbGetDebtors, dbAddDebtorCharge, dbUpdateProduct
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
@@ -282,19 +282,42 @@ export default function BuffetModule() {
     setSelling(true)
 
     try {
-      if (!bp.is_composite && bp.stock !== null && bp.stock < qty) {
-        toast(`El producto "${bp.name}" no tiene suficiente stock (${bp.stock} disp.)`, 'danger')
-        setSelling(false)
-        return
+      // Validar stock (simple o componentes de combo)
+      if (!bp.is_composite) {
+        if (bp.stock !== null && bp.stock < qty) {
+          toast(`El producto "${bp.name}" no tiene suficiente stock (${bp.stock} disp.)`, 'danger')
+          setSelling(false)
+          return
+        }
+      } else {
+        // Es compuesto, verificar stock de cada componente
+        for (const comp of (bp.buffet_product_components || [])) {
+          const reqQty = comp.quantity * qty
+          if (comp.component_product_id && comp.products) {
+            if (comp.products.stock !== null && comp.products.stock < reqQty) {
+              toast(`El insumo "${comp.products.name}" no tiene suficiente stock (${comp.products.stock} disp.)`, 'danger')
+              setSelling(false)
+              return
+            }
+          } else if (comp.component_buffet_product_id && comp.buffet_products) {
+            if (comp.buffet_products.stock !== null && comp.buffet_products.stock < reqQty) {
+              toast(`El insumo de buffet "${comp.buffet_products.name}" no tiene suficiente stock (${comp.buffet_products.stock} disp.)`, 'danger')
+              setSelling(false)
+              return
+            }
+          }
+        }
       }
 
       const total = bp.price * qty
-      const cost = (bp.cost_price || 0) * qty
+      
+      // Calcular costo real (si es compuesto, se calcula al momento o se usa el guardado, pero usamos getDisplayCost para asegurar precisión)
+      const cost = getDisplayCost(bp) * qty
 
       // 1. Create Sale (Finances)
       const sale = await dbCreateSale(
         tenantId, userInfo?.id,
-        [{ buffet_product_id: bp.id, quantity: qty, unit_price: bp.price, unit_cost: bp.cost_price || 0, subtotal: total }],
+        [{ buffet_product_id: bp.id, quantity: qty, unit_price: bp.price, unit_cost: getDisplayCost(bp), subtotal: total }],
         total, cost,
         paymentMethod,
         paymentMethod === 'deudor' ? selectedDebtor.id : null
@@ -313,9 +336,19 @@ export default function BuffetModule() {
         buffet_product_id: bp.id, quantity: qty, unit_price: bp.price, subtotal: total
       }], paymentMethod === 'deudor' ? selectedDebtor.name : null)
 
-      // Decrease stock if it's a simple product
+      // 4. Descontar Stock
       if (!bp.is_composite && bp.stock !== null) {
         await dbUpdateBuffetProduct(bp.id, { stock: bp.stock - qty })
+      } else if (bp.is_composite) {
+        // Descontar a los componentes
+        for (const comp of (bp.buffet_product_components || [])) {
+          const reqQty = comp.quantity * qty
+          if (comp.component_product_id && comp.products?.stock !== null) {
+            await dbUpdateProduct(comp.component_product_id, { stock: comp.products.stock - reqQty })
+          } else if (comp.component_buffet_product_id && comp.buffet_products?.stock !== null) {
+            await dbUpdateBuffetProduct(comp.component_buffet_product_id, { stock: comp.buffet_products.stock - reqQty })
+          }
+        }
       }
 
       await dbLogActivity(tenantId, userInfo?.id, 'create', 'buffet_order', order.id, {
