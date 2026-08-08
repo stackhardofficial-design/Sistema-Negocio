@@ -351,6 +351,12 @@ export default function ProductosModule() {
     return (((p.price - cost) / p.price) * 100).toFixed(1)
   }
 
+  const markup = (p) => {
+    const cost = getDisplayCost(p)
+    if (!p.price || !cost || cost === 0) return null
+    return (((p.price - cost) / cost) * 100).toFixed(1)
+  }
+
   const getDisplayCost = (p) => {
     if (p.is_composite) {
       return p.product_components?.reduce((acc, c) => {
@@ -480,7 +486,8 @@ export default function ProductosModule() {
                   <th>Categoría</th>
                   <th style={{ textAlign: 'right' }}>Precio</th>
                   <th style={{ textAlign: 'right' }}>Costo</th>
-                  <th style={{ textAlign: 'right' }}>Margen</th>
+                  <th style={{ textAlign: 'right' }} title="Ganancia sobre costo">Ganancia</th>
+                  <th style={{ textAlign: 'right' }} title="Margen sobre venta">Margen</th>
                   <th style={{ textAlign: 'right' }}>Stock</th>
                   <th>Estado</th>
                   <th>Acciones</th>
@@ -498,6 +505,7 @@ export default function ProductosModule() {
                   </tr>
                 ) : filtered.map(p => {
                   const mg = margin(p)
+                  const mk = markup(p)
                   const dispStock = getDisplayStock(p)
                   const isLowStock = !p.is_composite && p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock
                   return (
@@ -522,6 +530,12 @@ export default function ProductosModule() {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--accent)' }}>{formatMoney(p.price)}</td>
                       <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{formatMoney(getDisplayCost(p))}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {mk !== null
+                          ? <span style={{ color: parseFloat(mk) >= 30 ? 'var(--success)' : 'var(--warning)', fontWeight: 500 }}>{mk}%</span>
+                          : '—'
+                        }
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         {mg !== null
                           ? <span style={{ color: parseFloat(mg) >= 20 ? 'var(--success)' : 'var(--warning)', fontWeight: 500 }}>{mg}%</span>
