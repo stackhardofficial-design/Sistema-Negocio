@@ -113,6 +113,20 @@ function IconDeudor({ active }) {
   )
 }
 
+function IconMultipagos({ active }) {
+  const c = active ? '#8b5cf6' : '#6b7280'
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="6" width="12" height="24" rx="2" fill={active ? 'rgba(139,92,246,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.5"/>
+      <circle cx="10" cy="18" r="3" stroke={c} strokeWidth="1.2" />
+      <rect x="20" y="12" width="12" height="12" rx="2" fill={active ? 'rgba(139,92,246,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.5"/>
+      <path d="M16 18 H20" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
+      <text x="10" y="19.5" textAnchor="middle" fontSize="5" fontWeight="bold" fill={c} fontFamily="system-ui">$</text>
+      <text x="26" y="19.5" textAnchor="middle" fontSize="5" fontWeight="bold" fill={c} fontFamily="system-ui">MP</text>
+    </svg>
+  )
+}
+
 const PAYMENT_METHODS = [
   {
     id: 'efectivo',
@@ -143,6 +157,16 @@ const PAYMENT_METHODS = [
     colorSoft: 'rgba(245,158,11,0.12)',
     colorBorder: 'rgba(245,158,11,0.45)',
     colorGlow: 'rgba(245,158,11,0.22)',
+  },
+  {
+    id: 'multipagos',
+    label: 'Multipagos',
+    sublabel: 'Efectivo + Transf',
+    IconComponent: IconMultipagos,
+    color: '#8b5cf6',
+    colorSoft: 'rgba(139,92,246,0.12)',
+    colorBorder: 'rgba(139,92,246,0.45)',
+    colorGlow: 'rgba(139,92,246,0.25)',
   },
 ]
 

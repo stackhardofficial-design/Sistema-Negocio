@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetSales, dbCancelSale, dbLogActivity,
-  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo
+  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo, dbResolveMultipagoSale
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -48,6 +48,7 @@ export default function RegistroVentasModule() {
   const [cancelModal, setCancelModal] = useState({ open: false, sale: null, reason: '' })
   const [editModal, setEditModal] = useState({ open: false, sale: null, items: [] })
   const [savingEdit, setSavingEdit] = useState(false)
+  const [multipagoModal, setMultipagoModal] = useState({ open: false, sale: null, cash: '', transfer: '' })
 
   useEffect(() => {
     loadSales()
@@ -103,6 +104,45 @@ export default function RegistroVentasModule() {
       count: completed.length + autoconsumo.length
     }
   }, [filteredSales])
+
+  // ===== RESOLVER MULTIPAGO =====
+  function handleCashChange(e) {
+    const val = e.target.value
+    setMultipagoModal(prev => {
+      const parsed = parseFloat(val)
+      const diff = (!isNaN(parsed) && prev.sale) ? Math.max(0, prev.sale.total_amount - parsed) : ''
+      return { ...prev, cash: val, transfer: diff.toString() }
+    })
+  }
+
+  function handleTransferChange(e) {
+    const val = e.target.value
+    setMultipagoModal(prev => {
+      const parsed = parseFloat(val)
+      const diff = (!isNaN(parsed) && prev.sale) ? Math.max(0, prev.sale.total_amount - parsed) : ''
+      return { ...prev, transfer: val, cash: diff.toString() }
+    })
+  }
+
+  async function resolveMultipago() {
+    const cash = parseFloat(multipagoModal.cash) || 0
+    const transfer = parseFloat(multipagoModal.transfer) || 0
+    if (cash + transfer !== multipagoModal.sale.total_amount) {
+      return toast('La suma debe ser igual al total de la venta', 'warning')
+    }
+    
+    setSavingEdit(true)
+    try {
+      await dbResolveMultipagoSale(multipagoModal.sale.id, cash, transfer)
+      toast('Pago registrado correctamente', 'success')
+      setMultipagoModal({ open: false, sale: null, cash: '', transfer: '' })
+      loadSales(false)
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
 
   // ===== ANULAR VENTA =====
   async function handleCancel() {
@@ -293,6 +333,7 @@ export default function RegistroVentasModule() {
               <option value="">Todos</option>
               <option value="efectivo">💵 Efectivo</option>
               <option value="transferencia">📲 Transferencia</option>
+              <option value="multipagos">💳 Multipagos</option>
               <option value="deudor">📒 Deudor</option>
             </select>
           </div>
@@ -338,6 +379,7 @@ export default function RegistroVentasModule() {
                     onDetail={() => setDetailModal({ open: true, sale })}
                     onCancel={() => setCancelModal({ open: true, sale, reason: '' })}
                     onEdit={() => openEditModal(sale)}
+                    onResolveMultipago={() => setMultipagoModal({ open: true, sale, cash: '', transfer: '' })}
                   />
                 ))}
               </tbody>
@@ -600,28 +642,81 @@ export default function RegistroVentasModule() {
           ))}
         </div>
       </Modal>
+
+      {/* ===== MODAL: RESOLVER MULTIPAGO ===== */}
+      <Modal
+        open={multipagoModal.open}
+        onClose={() => setMultipagoModal({ open: false, sale: null, cash: '', transfer: '' })}
+        title="Completar Multipago"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setMultipagoModal({ open: false, sale: null, cash: '', transfer: '' })} className="btn btn-secondary">
+              Cancelar
+            </button>
+            <button onClick={resolveMultipago} className="btn btn-primary" disabled={savingEdit}>
+              {savingEdit ? 'Guardando...' : 'Confirmar pago'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total a cubrir</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{formatMoney(multipagoModal.sale?.total_amount)}</div>
+          </div>
+          
+          <div className="form-group">
+            <label className="form-label">Efectivo 💵</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>$</span>
+              <input type="number" step="0.01" value={multipagoModal.cash} onChange={handleCashChange} style={{ paddingLeft: '24px' }} placeholder="0.00" autoFocus />
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label className="form-label">Transferencia / Mercado Pago 📲</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>$</span>
+              <input type="number" step="0.01" value={multipagoModal.transfer} onChange={handleTransferChange} style={{ paddingLeft: '24px' }} placeholder="0.00" />
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
 
 // ===== COMPONENTE FILA DE VENTA =====
-function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
+function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago }) {
   const cancelled = sale.status === 'cancelled'
   const isAutoconsumo = sale.status === 'autoconsumo'
+  const isPendingMultipago = sale.status === 'pending_multipago'
   const profit = isAutoconsumo ? -(sale.total_cost || 0) : (sale.total_amount || 0) - (sale.total_cost || 0)
+
+  let bgNormal = isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)'
+  let bgHover = isAutoconsumo ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)'
+  
+  if (cancelled) {
+    bgNormal = 'var(--danger-soft)'
+    bgHover = 'var(--danger-soft)'
+  } else if (isPendingMultipago) {
+    bgNormal = 'rgba(16, 185, 129, 0.3)' // Fondo verde llamativo
+    bgHover = 'rgba(16, 185, 129, 0.4)'
+  }
 
   return (
     <tr 
-      onClick={onDetail}
+      onClick={isPendingMultipago ? onResolveMultipago : onDetail}
       style={{ 
         cursor: 'pointer',
         opacity: cancelled ? 0.7 : 1,
-        background: cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)',
+        background: bgNormal,
         borderBottom: '1px solid var(--border)',
         transition: 'all 0.15s ease'
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = cancelled ? 'var(--danger-soft)' : isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = bgHover }}
+      onMouseLeave={e => { e.currentTarget.style.background = bgNormal }}
     >
       <td style={{ padding: '12px' }}>
         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDate(sale.created_at)}</div>
@@ -655,8 +750,8 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
         <PaymentBadge method={sale.payment_method} debtorName={sale.debtors?.name} />
       </td>
       <td style={{ padding: '12px', textAlign: 'center' }}>
-        <span className={`badge ${cancelled ? 'badge-danger' : isAutoconsumo ? 'badge-primary' : 'badge-success'}`} style={{ fontSize: '0.7rem', background: isAutoconsumo ? '#8b5cf6' : undefined, color: isAutoconsumo ? 'white' : undefined, border: isAutoconsumo ? 'none' : undefined }}>
-          {cancelled ? 'ANULADA' : isAutoconsumo ? 'AUTOCONSUMO' : 'COMPLETADA'}
+        <span className={`badge ${cancelled ? 'badge-danger' : isAutoconsumo ? 'badge-primary' : isPendingMultipago ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem', background: isAutoconsumo ? '#8b5cf6' : undefined, color: isAutoconsumo ? 'white' : undefined, border: isAutoconsumo ? 'none' : undefined }}>
+          {cancelled ? 'ANULADA' : isAutoconsumo ? 'AUTOCONSUMO' : isPendingMultipago ? 'PENDIENTE (EDITAR)' : 'COMPLETADA'}
         </span>
       </td>
       <td style={{ padding: '12px', textAlign: 'right' }}>
@@ -671,7 +766,7 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
       </td>
       {isAdmin && (
         <td style={{ padding: '12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-          {!cancelled && !isAutoconsumo ? (
+          {!cancelled && !isAutoconsumo && !isPendingMultipago ? (
             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
               <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Editar / Autoconsumo" style={{ padding: '4px 8px' }}>
                 <Edit2 size={12} />
@@ -680,6 +775,10 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit }) {
                 <Trash2 size={12} />
               </button>
             </div>
+          ) : isPendingMultipago ? (
+             <button onClick={onResolveMultipago} className="btn btn-primary btn-sm" title="Completar" style={{ padding: '4px 12px', fontWeight: 800 }}>
+                Completar
+             </button>
           ) : (
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
           )}
@@ -695,6 +794,7 @@ function PaymentBadge({ method, debtorName }) {
     efectivo:      { label: '💵 Efectivo',       bg: 'rgba(16,185,129,0.12)',  color: '#10b981', border: 'rgba(16,185,129,0.35)' },
     transferencia: { label: '📲 Mercado Pago',  bg: 'rgba(0,158,227,0.12)',   color: '#009EE3', border: 'rgba(0,158,227,0.35)' },
     deudor:        { label: debtorName ? `📒 ${debtorName}` : '📒 Deudor', bg: 'rgba(245,158,11,0.10)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+    multipagos:    { label: '💳 Multipagos',     bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: 'rgba(139,92,246,0.45)' }
   }
   const cfg = map[method] || { label: method || '—', bg: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: 'var(--border)' }
   return (

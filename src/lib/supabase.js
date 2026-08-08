@@ -271,7 +271,7 @@ export async function dbGetSales(tenantId, opts = {}) {
 
 export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {
   const { data } = await sb.from('sales')
-    .select('total_amount, total_cost, created_at, payment_method')
+    .select('total_amount, total_cost, created_at, payment_method, cash_amount, transfer_amount')
     .eq('tenant_id', tenantId)
     .eq('status', 'completed')
     .gte('created_at', dateFrom)
@@ -280,13 +280,15 @@ export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {
 }
 
 export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCost, paymentMethod = 'efectivo', debtorId = null) {
+  const status = paymentMethod === 'multipagos' ? 'pending_multipago' : 'completed'
+
   // Create sale
   const { data: sale, error: saleErr } = await sb.from('sales').insert({
     tenant_id: tenantId,
     user_id: userId,
     total_amount: totalAmount,
     total_cost: totalCost,
-    status: 'completed',
+    status: status,
     payment_method: paymentMethod,
     debtor_id: debtorId || null
   }).select().single()
@@ -314,6 +316,18 @@ export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCo
   }
 
   return sale
+}
+
+export async function dbResolveMultipagoSale(saleId, cashAmount, transferAmount) {
+  const { data, error } = await sb.from('sales')
+    .update({
+      status: 'completed',
+      cash_amount: cashAmount,
+      transfer_amount: transferAmount
+    })
+    .eq('id', saleId).select().single()
+  if (error) throw error
+  return data
 }
 
 export async function dbCancelSale(saleId, userId, reason) {
