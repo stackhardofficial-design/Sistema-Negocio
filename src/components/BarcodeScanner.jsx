@@ -165,9 +165,11 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
                   if (!inline) {
                     stoppedRef.current = true
                     closeCamera()
+                    await handleScanned(code)
+                    return
+                  } else {
+                    await handleScanned(code)
                   }
-                  await handleScanned(code)
-                  return
                 }
               }
             } catch {}
@@ -217,9 +219,11 @@ export default function BarcodeScanner({ onScan, active = true, showCamera = fal
                       if (!inline) {
                         stoppedRef.current = true
                         closeCamera()
+                        await handleScanned(code)
+                        return
+                      } else {
+                        await handleScanned(code)
                       }
-                      await handleScanned(code)
-                      return
                     }
                   }
                 }
