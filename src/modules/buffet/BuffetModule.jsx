@@ -312,7 +312,7 @@ export default function BuffetModule() {
           <span className="icon-wrap"><Coffee size={20} /></span>
           Buffet
         </h1>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {tab === 'pedidos' && (
             <button onClick={() => setOrderModal({ open: true })} className="btn btn-primary">
               <Plus size={16} /> Nuevo pedido
@@ -338,7 +338,7 @@ export default function BuffetModule() {
 
       <div className="module-content">
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '20px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
           {[
             { id: 'pedidos', label: `📋 Pedidos ${activeOrders.length > 0 ? `(${activeOrders.length})` : ''}` },
             { id: 'productos', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><Utensils size={16}/> Stock & Productos Buffet</span> },
@@ -477,7 +477,7 @@ export default function BuffetModule() {
               const st = STATUS_LABELS[order.status] || STATUS_LABELS.pending
               return (
                 <div key={order.id} className="card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
                     <div>
                       <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {order.customer_name ? <span style={{display:'flex', alignItems:'center', gap:'4px'}}><User size={14}/> {order.customer_name}</span> : 'Pedido'}
@@ -487,8 +487,8 @@ export default function BuffetModule() {
                         {formatTime(order.created_at)} · {order.users?.name}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{formatMoney(order.total_amount)}</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--accent)', marginRight: '6px' }}>{formatMoney(order.total_amount)}</span>
                       {order.status === 'pending' && (
                         <button onClick={() => changeOrderStatus(order.id, 'preparing')} className="btn btn-secondary btn-sm">
                           Preparar
@@ -615,11 +615,11 @@ export default function BuffetModule() {
                 </button>
               </div>
               {form.ingredients.map((ing, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <select
                     value={ing.ingredient_id}
                     onChange={e => updateIngredient(i, 'ingredient_id', e.target.value)}
-                    style={{ flex: 2 }}
+                    style={{ flex: '1 1 150px' }}
                   >
                     <option value="">Seleccionar ingrediente...</option>
                     {ingredients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -628,13 +628,13 @@ export default function BuffetModule() {
                     type="number"
                     value={ing.quantity}
                     onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value))}
-                    style={{ width: '70px' }}
+                    style={{ flex: '1 1 70px', minWidth: '70px' }}
                     min="0" step="0.5"
                   />
                   <select
                     value={ing.unit}
                     onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                    style={{ width: '100px' }}
+                    style={{ flex: '1 1 100px', minWidth: '100px' }}
                   >
                     {['unidad', 'gramos', 'ml', 'porciones'].map(u => <option key={u} value={u}>{u}</option>)}
                   </select>
@@ -654,14 +654,14 @@ export default function BuffetModule() {
                 </button>
               </div>
               {form.components.map((c, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <select
                     value={c.is_buffet ? 'buffet' : 'standard'}
                     onChange={e => {
                       updateComponent(i, 'is_buffet', e.target.value === 'buffet');
                       updateComponent(i, 'component_id', '');
                     }}
-                    style={{ width: '120px' }}
+                    style={{ flex: '1 1 120px', minWidth: '100px' }}
                   >
                     <option value="buffet">Buffet</option>
                     <option value="standard">Kiosco</option>
@@ -669,7 +669,7 @@ export default function BuffetModule() {
                   <select
                     value={c.component_id}
                     onChange={e => updateComponent(i, 'component_id', e.target.value)}
-                    style={{ flex: 2 }}
+                    style={{ flex: '1 1 150px' }}
                   >
                     <option value="">Seleccionar producto...</option>
                     {(c.is_buffet ? buffetProducts : products).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -678,7 +678,7 @@ export default function BuffetModule() {
                     type="number"
                     value={c.quantity}
                     onChange={e => updateComponent(i, 'quantity', parseInt(e.target.value))}
-                    style={{ width: '70px' }}
+                    style={{ flex: '1 1 70px', minWidth: '70px' }}
                     min="1"
                   />
                   <button type="button" onClick={() => removeComponent(i)} className="btn btn-danger btn-sm">
