@@ -321,13 +321,13 @@ export default function VentasModule() {
       setQuantity(1)
       setBarcodeInput('')
       
-      // Limpiar método de pago para la siguiente venta (evita escaneos dobles accidentales)
-      setPaymentMethod(null)
-      setSelectedDebtor(null)
+      // Esperar 2 segundos antes de permitir el próximo escaneo
+      setTimeout(() => {
+        setLoading(false)
+      }, 2000)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
       setBarcodeInput('')
-    } finally {
       setLoading(false)
     }
   }, [tenantId, userInfo, loading, canScan, paymentMethod, selectedDebtor])

@@ -303,7 +303,7 @@ export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCo
     quantity: item.quantity,
     unit_price: item.unit_price,
     unit_cost: item.unit_cost,
-    subtotal: item.subtotal
+    subtotal: item.subtotal ?? (item.quantity * item.unit_price)
   }))
 
   const { error: itemsErr } = await sb.from('sale_items').insert(saleItems)
