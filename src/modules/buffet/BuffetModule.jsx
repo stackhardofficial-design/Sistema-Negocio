@@ -788,11 +788,11 @@ export default function BuffetModule() {
             fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)',
             textTransform: 'uppercase', letterSpacing: '0.05em'
           }}>
-            2. Escanear o seleccionar ({quantity} {quantity === 1 ? 'unidad' : 'unidades'})
+            2. Código o Escaneo ({quantity} {quantity === 1 ? 'unidad' : 'unidades'})
           </div>
 
-          {/* CONTROLES DE CANTIDAD */}
           <div style={{ display: 'flex', gap: '10px' }}>
+            {/* Controles de Cantidad */}
             <div style={{
               display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '4px'
@@ -816,6 +816,7 @@ export default function BuffetModule() {
               </button>
             </div>
             
+            {/* Input y Escáner estilo Ventas */}
             <div style={{ flex: 1, position: 'relative' }}>
               <BarcodeScanner 
                 onScan={(code) => {
@@ -828,7 +829,7 @@ export default function BuffetModule() {
                 }} 
                 active={orderModal.open && canScan} 
                 showCamera={true}
-                autoStart={orderModal.open && canScan}
+                autoStart={false} 
               />
               {!canScan && (
                 <div style={{
