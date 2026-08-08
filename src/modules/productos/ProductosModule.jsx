@@ -258,6 +258,13 @@ export default function ProductosModule() {
     if (!form.name.trim()) return toast('El nombre es obligatorio', 'warning')
     if (!form.price) return toast('El precio de venta es obligatorio', 'warning')
 
+    if (form.barcode && form.barcode.trim()) {
+      const existing = products.find(p => p.barcode === form.barcode.trim() && p.id !== modal.edit?.id)
+      if (existing) {
+        return toast(`El código de barras ya existe en el producto "${existing.name}". Usa otro.`, 'error')
+      }
+    }
+
     localStorage.setItem('last_product_category', form.category_id || '')
     setSaving(true)
     try {
