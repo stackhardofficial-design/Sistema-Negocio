@@ -691,7 +691,11 @@ export default function RegistroVentasModule() {
 function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago }) {
   const cancelled = sale.status === 'cancelled'
   const isAutoconsumo = sale.status === 'autoconsumo'
-  const isPendingMultipago = sale.status === 'pending_multipago'
+  
+  // Es multipago pendiente si el método es multipagos y la suma de pagos es menor al total
+  const isPendingMultipago = sale.payment_method === 'multipagos' && 
+    ((Number(sale.cash_amount) || 0) + (Number(sale.transfer_amount) || 0) < Number(sale.total_amount))
+    
   const profit = isAutoconsumo ? -(sale.total_cost || 0) : (sale.total_amount || 0) - (sale.total_cost || 0)
 
   let bgNormal = isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)'
