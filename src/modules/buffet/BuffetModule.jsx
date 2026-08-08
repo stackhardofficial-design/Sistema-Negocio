@@ -7,7 +7,8 @@ import {
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Coffee, Plus, Edit2, Trash2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle } from 'lucide-react'
+import BarcodeScanner from '../../components/BarcodeScanner'
+import { Coffee, Plus, Edit2, Trash2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle, ExternalLink } from 'lucide-react'
 
 function formatMoney(n) { return `$${Number(n || 0).toLocaleString('es-AR')}` }
 function formatTime(d) { return new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }
@@ -70,6 +71,12 @@ export default function BuffetModule() {
   function openCreate() {
     setForm({ name: '', barcode: '', price: '', cost_price: '', stock: '', min_stock: '', description: '', ingredients: [], components: [] })
     setProductTypeTab('simple')
+    setProductModal({ open: true, edit: null })
+  }
+
+  function openCreateCombo() {
+    setForm({ name: '', barcode: '', price: '', cost_price: '', stock: '', min_stock: '', description: '', ingredients: [], components: [] })
+    setProductTypeTab('combo')
     setProductModal({ open: true, edit: null })
   }
 
@@ -312,9 +319,14 @@ export default function BuffetModule() {
             </button>
           )}
           {tab === 'productos' && isAdmin() && (
-            <button onClick={openCreate} className="btn btn-primary">
-              <Plus size={16} /> Nuevo producto buffet
-            </button>
+            <>
+              <button onClick={openCreate} className="btn btn-primary">
+                <Plus size={16} /> Nuevo producto
+              </button>
+              <button onClick={openCreateCombo} className="btn btn-secondary" style={{ border: '1px solid var(--accent)', color: 'var(--accent)' }}>
+                <PkgIcon size={16} /> Nuevo combo
+              </button>
+            </>
           )}
           {tab === 'ingredientes' && isAdmin() && (
             <button onClick={openIngCreate} className="btn btn-primary">
@@ -548,7 +560,20 @@ export default function BuffetModule() {
             </div>
             <div className="form-group">
               <label className="form-label">Código (Opcional)</label>
-              <input value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} placeholder="Código de barras..." />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input 
+                  value={form.barcode} 
+                  onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} 
+                  placeholder="Código de barras..." 
+                  style={{ flex: 1 }}
+                />
+                <BarcodeScanner 
+                  onScan={(code) => setForm(p => ({ ...p, barcode: code }))} 
+                  active={productModal.open} 
+                  showCamera={true}
+                  autoStart={productModal.open}
+                />
+              </div>
             </div>
           </div>
           <div className="form-row">
