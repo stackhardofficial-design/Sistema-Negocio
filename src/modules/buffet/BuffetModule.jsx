@@ -1,16 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
   dbGetBuffetOrders, dbGetProducts, dbSetBuffetProductComponents,
-  dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity
+  dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity,
+  dbCreateSale, dbGetDebtors, dbAddDebtorCharge
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
-import { Coffee, Plus, Edit2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle, ExternalLink, X } from 'lucide-react'
+import { Coffee, Plus, Edit2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle, X, Zap, ChevronDown, Minus } from 'lucide-react'
 
 function formatMoney(n) { return `$${Number(n || 0).toLocaleString('es-AR')}` }
 function formatTime(d) { return new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    gain.gain.setValueAtTime(0.1, ctx.currentTime)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.1)
+  } catch(e) {
+    console.error('Audio beep failed', e)
+  }
+}
 
 const STATUS_LABELS = {
   pending: { label: 'Pendiente', color: 'var(--warning)', badge: 'badge-warning' },
@@ -19,9 +37,70 @@ const STATUS_LABELS = {
   delivered: { label: 'Entregado', color: 'var(--text-muted)', badge: 'badge-neutral' }
 }
 
+// ===== SVG ICONS CUSTOM =====
+function IconEfectivo({ active }) {
+  const c = active ? '#10b981' : '#6b7280'
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="10" width="30" height="18" rx="3" fill={active ? 'rgba(16,185,129,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.8"/>
+      <circle cx="18" cy="19" r="5" stroke={c} strokeWidth="1.6" fill={active ? 'rgba(16,185,129,0.12)' : 'none'}/>
+      <text x="18" y="23" textAnchor="middle" fontSize="7" fontWeight="bold" fill={c} fontFamily="system-ui">$</text>
+      <rect x="5" y="12" width="4" height="3" rx="1" fill={c} opacity="0.5"/>
+      <rect x="27" y="23" width="4" height="3" rx="1" fill={c} opacity="0.5"/>
+      <line x1="5" y1="22" x2="9" y2="22" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
+      <line x1="27" y1="17" x2="31" y2="17" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
+    </svg>
+  )
+}
+
+function IconMercadoPago({ active }) {
+  const color = active ? '#009EE3' : '#6b7280'
+  const opacityBg = active ? 0.15 : 0.05
+  return (
+    <svg width="42" height="36" viewBox="0 0 42 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="21" cy="18" rx="18" ry="12" fill={color} fillOpacity={opacityBg} />
+      <ellipse cx="21" cy="18" rx="18" ry="12" stroke={color} strokeWidth="1.5" />
+      <path d="M4 18 C4 11 11 6 21 6 C31 6 38 11 38 18 L4 18 Z" fill={color} fillOpacity="0.8" />
+      <path d="M4 18 C4 25 11 30 21 30 C31 30 38 25 38 18 L4 18 Z" fill={color} fillOpacity="0.8" />
+      <path d="M4 18 C6 18 10 16 16 16 L25 16 C32 16 36 18 38 18 C36 21 32 23 25 23 L16 23 C10 23 6 21 4 18 Z" fill={active ? '#ffffff' : 'var(--bg-secondary)'} />
+      <path d="M6 18 C8 17 12 16.5 15 16.5 C16 16.5 18 17 19 18 C20 19 20.5 20 20 21 C19 22 17 22.5 15 22.5 C13 22.5 11 21.5 10 21" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M12 21.5 C13 22.5 15 22.5 16 21.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M14 22 C15 23 16 23 17 22" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M36 18 C34 17.5 30 17 27 17 C25 17 23 16.5 22 17.5 C21 18.5 22 19.5 23 20.5 C24 21.5 26 21.5 28 20.5 C29 19.5 30 19.5 31 19" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M30 17 L29 19" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M22 17.5 C20 18.5 21 20 22 20.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconDeudor({ active }) {
+  const c = active ? '#f59e0b' : '#6b7280'
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="7" y="5" width="22" height="27" rx="3" fill={active ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.08)'} stroke={c} strokeWidth="1.7"/>
+      <line x1="7" y1="5" x2="7" y2="32" stroke={c} strokeWidth="3" strokeLinecap="round"/>
+      <line x1="12" y1="13" x2="25" y2="13" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+      <line x1="12" y1="18" x2="25" y2="18" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+      <line x1="12" y1="23" x2="20" y2="23" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+      {active && (
+        <>
+          <circle cx="27" cy="9" r="5" fill="#f59e0b"/>
+          <text x="27" y="12.5" textAnchor="middle" fontSize="6.5" fontWeight="bold" fill="#0f1117" fontFamily="system-ui">$</text>
+        </>
+      )}
+    </svg>
+  )
+}
+
+const PAYMENT_METHODS = [
+  { id: 'efectivo', label: 'Efectivo', sublabel: 'Pago en mano', IconComponent: IconEfectivo, color: '#10b981', colorSoft: 'rgba(16,185,129,0.12)', colorBorder: 'rgba(16,185,129,0.45)' },
+  { id: 'transferencia', label: 'Mercado Pago', sublabel: 'Transferencia', IconComponent: IconMercadoPago, color: '#009EE3', colorSoft: 'rgba(0,158,227,0.12)', colorBorder: 'rgba(0,158,227,0.45)' },
+  { id: 'deudor', label: 'Deudor', sublabel: 'Cargar a cuenta', IconComponent: IconDeudor, color: '#f59e0b', colorSoft: 'rgba(245,158,11,0.12)', colorBorder: 'rgba(245,158,11,0.45)' },
+]
+
 export default function BuffetModule() {
   const { tenantId, userInfo, toast, isAdmin } = useApp()
-  const [tab, setTab] = useState('productos') // productos | pedidos
+  const [tab, setTab] = useState('pedidos') // productos | pedidos
   const [buffetProducts, setBuffetProducts] = useState([])
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
@@ -33,8 +112,16 @@ export default function BuffetModule() {
   const [saving, setSaving] = useState(false)
 
   const [orderModal, setOrderModal] = useState({ open: false })
-  const [orderCart, setOrderCart] = useState([])
-  const [customerName, setCustomerName] = useState('')
+  
+  // VENTA LOGIC
+  const [paymentMethod, setPaymentMethod] = useState(null)
+  const [selectedDebtor, setSelectedDebtor] = useState(null)
+  const [debtors, setDebtors] = useState([])
+  const [loadingDebtors, setLoadingDebtors] = useState(false)
+  const [debtorDropdownOpen, setDebtorDropdownOpen] = useState(false)
+  const [quantity, setQuantity] = useState(1)
+  const quantityRef = useRef(1)
+  const [selling, setSelling] = useState(false)
 
   async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
@@ -60,6 +147,17 @@ export default function BuffetModule() {
       .subscribe()
     return () => { sb.removeChannel(channel) }
   }, [tenantId])
+
+  useEffect(() => { quantityRef.current = quantity }, [quantity])
+
+  useEffect(() => {
+    if (paymentMethod === 'deudor' && tenantId) {
+      setLoadingDebtors(true)
+      dbGetDebtors(tenantId, { includeSettled: false })
+        .then(data => setDebtors(data.filter(d => !d.is_settled)))
+        .finally(() => setLoadingDebtors(false))
+    }
+  }, [paymentMethod, tenantId])
 
   function openCreate() {
     setForm({ name: '', barcode: '', price: '', cost_price: '', stock: '', min_stock: '', description: '', components: [] })
@@ -135,7 +233,6 @@ export default function BuffetModule() {
       
       if (is_composite) {
         await dbSetBuffetProductComponents(id, form.components, tenantId)
-        // Calculate cost based on components
         const totalCost = form.components.reduce((acc, c) => acc + (parseFloat(c.cost || 0) * c.quantity), 0)
         await dbUpdateBuffetProduct(id, { cost_price: totalCost })
       } else {
@@ -167,28 +264,79 @@ export default function BuffetModule() {
   }
   function removeComponent(i) { setForm(f => ({ ...f, components: f.components.filter((_, idx) => idx !== i) })) }
 
-  // ===== ORDERS =====
-  function addToOrderCart(bp) {
-    setOrderCart(prev => {
-      const ex = prev.find(i => i.buffet_product_id === bp.id)
-      if (ex) return prev.map(i => i.buffet_product_id === bp.id ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.unit_price } : i)
-      return [...prev, { buffet_product_id: bp.id, name: bp.name, unit_price: bp.price, quantity: 1, subtotal: bp.price }]
-    })
-  }
+  // ===== INSTANT SELL LOGIC =====
+  const canScan = paymentMethod !== null && (paymentMethod !== 'deudor' || selectedDebtor !== null)
 
-  async function placeOrder() {
-    if (orderCart.length === 0) return toast('El pedido está vacío', 'warning')
-    try {
-      const created = await dbCreateBuffetOrder(tenantId, userInfo?.id, orderCart, customerName || null)
-      await dbLogActivity(tenantId, userInfo?.id, 'create', 'buffet_order', created.id, { items: orderCart.length })
-      setOrderCart([])
-      setCustomerName('')
-      setOrderModal({ open: false })
-      toast('Pedido registrado', 'success')
-    } catch (err) {
-      toast(`Error: ${err.message}`, 'danger')
+  const handleSellProduct = useCallback(async (bp) => {
+    if (!bp || !tenantId || selling) return
+    if (!canScan) {
+      toast('Seleccioná el método de pago antes de agregar/escanear', 'warning')
+      return
     }
-  }
+    if (paymentMethod === 'deudor' && !selectedDebtor) {
+      toast('Seleccioná un deudor', 'warning')
+      return
+    }
+
+    const qty = Math.max(1, quantityRef.current)
+    setSelling(true)
+
+    try {
+      if (!bp.is_composite && bp.stock !== null && bp.stock < qty) {
+        toast(`El producto "${bp.name}" no tiene suficiente stock (${bp.stock} disp.)`, 'danger')
+        setSelling(false)
+        return
+      }
+
+      const total = bp.price * qty
+      const cost = (bp.cost_price || 0) * qty
+
+      // 1. Create Sale (Finances)
+      const sale = await dbCreateSale(
+        tenantId, userInfo?.id,
+        [{ buffet_product_id: bp.id, quantity: qty, unit_price: bp.price, unit_cost: bp.cost_price || 0, subtotal: total }],
+        total, cost,
+        paymentMethod,
+        paymentMethod === 'deudor' ? selectedDebtor.id : null
+      )
+
+      // 2. Debtor charge if applies
+      if (paymentMethod === 'deudor' && selectedDebtor) {
+        await dbAddDebtorCharge(selectedDebtor.id, total, `Buffet: ${qty}x ${bp.name}`, [{
+          buffet_product_id: bp.id, product_name: bp.name, barcode: bp.barcode,
+          quantity: qty, unit_price: bp.price, subtotal: total
+        }])
+      }
+
+      // 3. Create Buffet Order (Kitchen)
+      const order = await dbCreateBuffetOrder(tenantId, userInfo?.id, [{
+        buffet_product_id: bp.id, quantity: qty, unit_price: bp.price, subtotal: total
+      }], paymentMethod === 'deudor' ? selectedDebtor.name : null)
+
+      // Decrease stock if it's a simple product
+      if (!bp.is_composite && bp.stock !== null) {
+        await dbUpdateBuffetProduct(bp.id, { stock: bp.stock - qty })
+      }
+
+      await dbLogActivity(tenantId, userInfo?.id, 'create', 'buffet_order', order.id, {
+        product: bp.name, quantity: qty, total, payment_method: paymentMethod
+      })
+
+      playBeep()
+      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : `📒 ${selectedDebtor.name}`
+      toast(`${qty}x ${bp.name} enviado a la cocina · ${formatMoney(total)} · ${methodLabel}`, 'success')
+
+      setQuantity(1)
+      setPaymentMethod(null)
+      setSelectedDebtor(null)
+      setOrderModal({ open: false })
+      load(false)
+    } catch (err) {
+      toast(`Error al registrar: ${err.message}`, 'danger')
+    } finally {
+      setSelling(false)
+    }
+  }, [tenantId, userInfo, selling, canScan, paymentMethod, selectedDebtor])
 
   async function changeOrderStatus(orderId, status) {
     try {
@@ -216,6 +364,8 @@ export default function BuffetModule() {
     if (p.is_composite) return null // Combos don't have stock themselves, it's calculated on demand
     return p.stock
   }
+
+  const activeMethod = PAYMENT_METHODS.find(m => m.id === paymentMethod)
 
   return (
     <div className="fade-in">
@@ -347,7 +497,7 @@ export default function BuffetModule() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
                     <div>
                       <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {order.customer_name ? <span style={{display:'flex', alignItems:'center', gap:'4px'}}><User size={14}/> {order.customer_name}</span> : 'Pedido'}
+                        {order.customer_name ? <span style={{display:'flex', alignItems:'center', gap:'4px'}}><User size={14}/> {order.customer_name}</span> : 'Pedido de Buffet'}
                         <span className={`badge ${st.badge}`}>{st.label}</span>
                       </div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -519,56 +669,202 @@ export default function BuffetModule() {
         </div>
       </Modal>
 
-      {/* ===== MODAL Nuevo Pedido ===== */}
+      {/* ===== MODAL Nuevo Pedido (Venta Express Buffet) ===== */}
       <Modal
         open={orderModal.open}
-        onClose={() => { setOrderModal({ open: false }); setOrderCart([]); setCustomerName('') }}
-        title="Nuevo pedido"
-        size="lg"
-        footer={
-          <>
-            <button onClick={() => { setOrderModal({ open: false }); setOrderCart([]) }} className="btn btn-secondary">Cancelar</button>
-            <button onClick={placeOrder} className="btn btn-primary" disabled={orderCart.length === 0}>
-              Confirmar pedido ({formatMoney(orderCart.reduce((a, i) => a + i.subtotal, 0))})
-            </button>
-          </>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div className="form-group">
-            <label className="form-label">Nombre del cliente (opcional)</label>
-            <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Ej: Juan..." />
+        onClose={() => { setOrderModal({ open: false }); setPaymentMethod(null); setQuantity(1) }}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Zap size={20} color="var(--accent)" />
+            Venta Rápida Buffet
           </div>
+        }
+        size="lg"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          <div className="form-group">
-            <label className="form-label">Escanear producto</label>
-            <BarcodeScanner 
-              onScan={(code) => {
-                const found = buffetProducts.find(p => p.barcode === code)
-                if (found) {
-                  addToOrderCart(found)
-                  toast(`Agregado: ${found.name}`, 'success')
-                } else {
-                  toast(`Código no encontrado: ${code}`, 'warning')
-                }
-              }} 
-              active={orderModal.open} 
-              showCamera={true}
-              autoStart={orderModal.open}
-            />
+          {/* SELECTOR DE PAGO */}
+          <div style={{
+            background: 'var(--bg-secondary)',
+            border: `2px solid ${activeMethod ? activeMethod.colorBorder : 'var(--border)'}`,
+            borderRadius: '16px',
+            padding: '16px',
+            transition: 'all 0.2s',
+            boxShadow: activeMethod ? `0 0 0 3px ${activeMethod.colorSoft}` : 'none'
+          }}>
+            <div style={{
+              fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)',
+              textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px'
+            }}>
+              1. Método de pago
+            </div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px'
+            }}>
+              {PAYMENT_METHODS.map(method => {
+                const isActive = paymentMethod === method.id
+                return (
+                  <button
+                    key={method.id}
+                    onClick={() => {
+                      setPaymentMethod(method.id)
+                      setSelectedDebtor(null)
+                      setDebtorDropdownOpen(false)
+                    }}
+                    style={{
+                      background: isActive ? method.colorSoft : 'var(--bg-tertiary)',
+                      border: `1px solid ${isActive ? method.colorBorder : 'var(--border)'}`,
+                      padding: '14px 10px', borderRadius: '12px', cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <method.IconComponent active={isActive} />
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: isActive ? method.color : 'var(--text-primary)' }}>
+                        {method.label}
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{method.sublabel}</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Selector Deudor si corresponde */}
+            {paymentMethod === 'deudor' && (
+              <div style={{ marginTop: '14px', position: 'relative' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Seleccionar cuenta
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setDebtorDropdownOpen(v => !v)}
+                    style={{
+                      width: '100%', padding: '12px 14px',
+                      background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between',
+                      alignItems: 'center', cursor: 'pointer'
+                    }}
+                  >
+                    {selectedDebtor ? (
+                      <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <User size={16} color="var(--accent)" /> {selectedDebtor.name}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>{loadingDebtors ? 'Cargando cuentas...' : 'Elegir cliente...'}</span>
+                    )}
+                    <ChevronDown size={16} />
+                  </button>
+                  {debtorDropdownOpen && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0,
+                      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-md)', marginTop: '4px', zIndex: 50,
+                      maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                    }}>
+                      {debtors.length === 0 && <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)' }}>No hay deudores activos</div>}
+                      {debtors.map(d => (
+                        <button
+                          key={d.id}
+                          onClick={() => { setSelectedDebtor(d); setDebtorDropdownOpen(false) }}
+                          style={{
+                            width: '100%', padding: '12px 14px', border: 'none', background: 'transparent',
+                            textAlign: 'left', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                          }}
+                        >
+                          <span style={{ fontWeight: 500 }}>{d.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{
+            fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)',
+            textTransform: 'uppercase', letterSpacing: '0.05em'
+          }}>
+            2. Escanear o seleccionar ({quantity} {quantity === 1 ? 'unidad' : 'unidades'})
+          </div>
+
+          {/* CONTROLES DE CANTIDAD */}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '4px'
+            }}>
+              <button 
+                onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                className="btn btn-secondary" 
+                style={{ width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Minus size={18} />
+              </button>
+              <div style={{ width: '50px', textAlign: 'center', fontWeight: 700, fontSize: '1.2rem' }}>
+                {quantity}
+              </div>
+              <button 
+                onClick={() => setQuantity(q => q + 1)}
+                className="btn btn-secondary" 
+                style={{ width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+            
+            <div style={{ flex: 1, position: 'relative' }}>
+              <BarcodeScanner 
+                onScan={(code) => {
+                  const found = buffetProducts.find(p => p.barcode === code)
+                  if (found) {
+                    handleSellProduct(found)
+                  } else {
+                    toast(`Código no encontrado en buffet: ${code}`, 'warning')
+                  }
+                }} 
+                active={orderModal.open && canScan} 
+                showCamera={true}
+                autoStart={orderModal.open && canScan}
+              />
+              {!canScan && (
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  background: 'rgba(0,0,0,0.5)', zIndex: 10, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)',
+                  backdropFilter: 'blur(2px)'
+                }}>
+                  <span style={{ background: 'var(--bg)', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}>
+                    Seleccioná el pago arriba
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           <label className="form-label">O seleccionar manualmente</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', position: 'relative' }}>
+            {!canScan && (
+              <div style={{
+                position: 'absolute', top: '-10px', left: '-10px', right: '-10px', bottom: '-10px',
+                background: 'rgba(0,0,0,0.5)', zIndex: 10, borderRadius: 'var(--radius-md)',
+                backdropFilter: 'blur(1px)'
+              }}></div>
+            )}
             {buffetProducts.map(bp => (
               <button
                 key={bp.id}
-                onClick={() => addToOrderCart(bp)}
+                onClick={() => handleSellProduct(bp)}
+                disabled={!canScan || selling}
                 style={{
                   padding: '12px 14px', background: 'var(--bg-tertiary)',
                   border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-                  display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start'
+                  cursor: canScan ? 'pointer' : 'not-allowed', textAlign: 'left', transition: 'all 0.15s',
+                  display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start',
+                  opacity: canScan ? 1 : 0.6
                 }}
               >
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: '1.3' }}>{bp.name}</span>
@@ -576,17 +872,7 @@ export default function BuffetModule() {
               </button>
             ))}
           </div>
-          {orderCart.length > 0 && (
-            <div>
-              <label className="form-label">Pedido actual</label>
-              {orderCart.map(item => (
-                <div key={item.buffet_product_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span>{item.quantity}x {item.name}</span>
-                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{formatMoney(item.subtotal)}</span>
-                </div>
-              ))}
-            </div>
-          )}
+
         </div>
       </Modal>
     </div>

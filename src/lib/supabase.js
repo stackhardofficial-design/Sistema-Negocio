@@ -254,7 +254,7 @@ export async function lookupBarcode(barcode) {
 // ===== SALES =====
 export async function dbGetSales(tenantId, opts = {}) {
   let q = sb.from('sales')
-    .select('*, sale_items(*, products(name, barcode, categories(name))), users!sales_user_id_fkey(name), debtors(name)')
+    .select('*, sale_items(*, products(name, barcode, categories(name)), buffet_products(name, barcode)), users!sales_user_id_fkey(name), debtors(name)')
     .eq('tenant_id', tenantId)
 
   if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
@@ -296,11 +296,12 @@ export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCo
   // Create items
   const saleItems = items.map(item => ({
     sale_id: sale.id,
-    product_id: item.product_id,
+    product_id: item.product_id || null,
+    buffet_product_id: item.buffet_product_id || null,
     quantity: item.quantity,
     unit_price: item.unit_price,
     unit_cost: item.unit_cost,
-    subtotal: item.quantity * item.unit_price
+    subtotal: item.subtotal
   }))
 
   const { error: itemsErr } = await sb.from('sale_items').insert(saleItems)

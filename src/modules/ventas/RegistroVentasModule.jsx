@@ -392,8 +392,8 @@ export default function RegistroVentasModule() {
                 <tbody>
                   {(detailModal.sale.sale_items || []).map((item, i) => (
                     <tr key={i}>
-                      <td>{item.products?.name || '—'}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.products?.barcode || '—'}</td>
+                      <td>{item.products?.name || item.buffet_products?.name || '—'}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.products?.barcode || item.buffet_products?.barcode || '—'}</td>
                       <td style={{ textAlign: 'right' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right' }}>{formatMoney(item.unit_price)}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatMoney(item.subtotal)}</td>
