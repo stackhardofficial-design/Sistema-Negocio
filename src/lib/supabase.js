@@ -448,8 +448,19 @@ export async function dbDeleteIngredient(id) {
 // ===== BUFFET PRODUCTS =====
 export async function dbGetBuffetProducts(tenantId) {
   const { data } = await sb.from('buffet_products')
-    .select('*, buffet_ingredients(*, ingredients(name, stock, cost_price, unit))')
+    .select(`
+      *, 
+      buffet_ingredients(*, ingredients(name, stock, cost_price, unit)),
+      buffet_product_components!composite_buffet_product_id(
+        quantity,
+        component_buffet_product_id,
+        component_product_id,
+        products(name, cost_price, price, barcode)
+      )
+    `)
     .eq('tenant_id', tenantId).eq('is_active', true).order('name')
+  
+  // Note: we fetch component_buffet_product details separately or rely on the local list since we load all buffet products anyway.
   return data || []
 }
 
@@ -476,6 +487,20 @@ export async function dbSetBuffetIngredients(buffetProductId, ingredientsList) {
     unit: i.unit || 'unidad'
   }))
   const { error } = await sb.from('buffet_ingredients').insert(rows)
+  if (error) throw error
+}
+
+export async function dbSetBuffetProductComponents(compositeId, componentsList, tenantId) {
+  await sb.from('buffet_product_components').delete().eq('composite_buffet_product_id', compositeId)
+  if (componentsList.length === 0) return
+  const rows = componentsList.map(c => ({
+    tenant_id: tenantId,
+    composite_buffet_product_id: compositeId,
+    component_buffet_product_id: c.is_buffet ? c.component_id : null,
+    component_product_id: c.is_buffet ? null : c.component_id,
+    quantity: c.quantity
+  }))
+  const { error } = await sb.from('buffet_product_components').insert(rows)
   if (error) throw error
 }
 
