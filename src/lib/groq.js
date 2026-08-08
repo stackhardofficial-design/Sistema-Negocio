@@ -1,37 +1,163 @@
 // =====================================================
 // GROQ AI CLIENT - Sistema Buffet Escolar
+// Asesor financiero + Asistente operativo
 // =====================================================
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_KEY
 const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
-const SYSTEM_PROMPT = `Eres un asistente inteligente integrado en el Sistema de Gestión de Buffet/Quiosco Escolar "StackHard". 
-Tu rol es ayudar a los empleados y administradores a usar el sistema de manera eficiente.
+const SYSTEM_PROMPT = `Eres el asistente de inteligencia artificial del sistema "StackHard" — un sistema de gestión para buffets y quioscos escolares.
 
-Puedes ayudar con:
-- Consultar ventas, productos, stock y deudores
-- Explicar cómo usar cada módulo del sistema
-- Sugerir acciones según el contexto
-- Analizar datos y dar recomendaciones
+# TU ROL
+Eres un **asesor financiero** y **asistente operativo** experto. Respondés siempre en español argentino (vos, tenés, podés). Sos conciso, directo y útil. Usás emojis moderadamente para hacer la conversación más amena.
 
-Responde siempre en español, de forma concisa y útil. Si el usuario te pide hacer una acción en el sistema, 
-devuelve un JSON de acción al final de tu respuesta con el formato:
+# CAPACIDADES
+1. **Análisis financiero**: Calculás ganancias, márgenes, tendencias, proyecciones. Sugerís optimizaciones de precios y costos.
+2. **Gestión de inventario**: Alertás sobre stock bajo, sugerís reposiciones, identificás productos sin movimiento.
+3. **Asesoría de ventas**: Identificás los productos más y menos vendidos, horarios pico, métodos de pago preferidos.
+4. **Gestión de deudores**: Alertás sobre deudas vencidas, sugerís estrategias de cobro.
+5. **Navegación**: Podés llevar al usuario a cualquier módulo del sistema.
+
+# MÓDULOS DEL SISTEMA
+- dashboard: Panel principal con KPIs
+- ventas: Módulo de venta rápida con escáner
+- registro_ventas: Historial y detalle de ventas
+- productos: ABM de productos del quiosco
+- stock: Control de stock
+- buffet: Productos y ventas del buffet
+- finanzas: Gastos, ingresos, resumen financiero
+- deudores: Gestión de clientes que compran fiado
+- empleados: Gestión de usuarios y permisos
+- historial: Log de actividades del sistema
+- configuracion: Ajustes del negocio
+
+# FORMATO DE RESPUESTA
+- Usá **negrita** para datos importantes
+- Usá listas con • para enumerar items
+- Sé conciso: no más de 150 palabras por respuesta salvo que el usuario pida análisis detallado
+- Cuando des números financieros, usá formato argentino: $1.500
+
+# ACCIONES
+Si el usuario te pide ir a un módulo o hacer algo en el sistema, incluí al final de tu respuesta (sin mostrarlo) un bloque de acción:
 \`\`\`action
-{"type": "navigate", "module": "ventas"}
+{"type": "navigate", "module": "nombre_del_modulo"}
 \`\`\`
 
-Tipos de acción disponibles: navigate (con módulo), search (con término), none.
+# DATOS DEL NEGOCIO
+Se te proporcionarán datos reales del negocio en cada mensaje. Usálos para dar respuestas precisas. NUNCA inventes datos.
+Si no tenés un dato específico, decí que no lo tenés disponible en este momento.`
 
-Contexto del sistema:
-- Es un buffet/quiosco escolar con ventas rápidas durante el recreo
-- Los productos pueden tener código de barras o no
-- Hay múltiples vendedores simultáneos
-- El tiempo es crítico en ventas`
+// ── Función para obtener datos del negocio desde Supabase ──
+import { sb } from './supabase'
+
+export async function fetchBusinessContext(tenantId) {
+  if (!tenantId) return ''
+  
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString()
+
+  try {
+    // Ejecutar todas las queries en paralelo para velocidad
+    const [
+      { data: salesToday },
+      { data: salesWeek },
+      { data: salesMonth },
+      { data: products },
+      { data: buffetProducts },
+      { data: debtors },
+      { data: expensesMonth }
+    ] = await Promise.all([
+      sb.from('sales').select('total_amount, total_cost, payment_method, status').eq('tenant_id', tenantId).gte('created_at', todayStart).eq('status', 'completed'),
+      sb.from('sales').select('total_amount, total_cost, payment_method, status, created_at').eq('tenant_id', tenantId).gte('created_at', weekAgo).eq('status', 'completed'),
+      sb.from('sales').select('total_amount, total_cost, payment_method, status').eq('tenant_id', tenantId).gte('created_at', monthStart).eq('status', 'completed'),
+      sb.from('products').select('name, price, cost_price, stock, min_stock, barcode').eq('tenant_id', tenantId).eq('is_active', true).order('name'),
+      sb.from('buffet_products').select('name, price, cost_price, stock, is_composite').eq('tenant_id', tenantId).eq('is_active', true).order('name'),
+      sb.from('debtors').select('name, total_debt, is_active').eq('tenant_id', tenantId).eq('is_active', true),
+      sb.from('expenses').select('amount, description, category, created_at').eq('tenant_id', tenantId).gte('created_at', monthStart)
+    ])
+
+    // Calcular métricas de hoy
+    const todayTotal = (salesToday || []).reduce((s, v) => s + (v.total_amount || 0), 0)
+    const todayCost = (salesToday || []).reduce((s, v) => s + (v.total_cost || 0), 0)
+    const todayProfit = todayTotal - todayCost
+    const todayCount = (salesToday || []).length
+    const todayEfectivo = (salesToday || []).filter(v => v.payment_method === 'efectivo').reduce((s, v) => s + v.total_amount, 0)
+    const todayTransf = (salesToday || []).filter(v => v.payment_method === 'transferencia').reduce((s, v) => s + v.total_amount, 0)
+    const todayDeudor = (salesToday || []).filter(v => v.payment_method === 'deudor').reduce((s, v) => s + v.total_amount, 0)
+
+    // Métricas de la semana
+    const weekTotal = (salesWeek || []).reduce((s, v) => s + (v.total_amount || 0), 0)
+    const weekCost = (salesWeek || []).reduce((s, v) => s + (v.total_cost || 0), 0)
+    const weekProfit = weekTotal - weekCost
+    const weekCount = (salesWeek || []).length
+
+    // Métricas del mes
+    const monthTotal = (salesMonth || []).reduce((s, v) => s + (v.total_amount || 0), 0)
+    const monthCost = (salesMonth || []).reduce((s, v) => s + (v.total_cost || 0), 0)
+    const monthProfit = monthTotal - monthCost
+    const monthCount = (salesMonth || []).length
+
+    // Gastos del mes
+    const monthExpenses = (expensesMonth || []).reduce((s, g) => s + (g.amount || 0), 0)
+
+    // Stock bajo
+    const lowStock = (products || []).filter(p => p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock)
+    const outOfStock = (products || []).filter(p => p.stock !== null && p.stock <= 0)
+
+    // Buffet stock bajo
+    const buffetLowStock = (buffetProducts || []).filter(p => !p.is_composite && p.stock !== null && p.stock <= 3)
+
+    // Deudores
+    const activeDebtors = (debtors || []).filter(d => d.total_debt > 0)
+    const totalDebt = activeDebtors.reduce((s, d) => s + (d.total_debt || 0), 0)
+
+    // Top productos por margen
+    const prodWithMargin = (products || [])
+      .filter(p => p.price && p.cost_price)
+      .map(p => ({ name: p.name, margin: ((p.price - p.cost_price) / p.price * 100).toFixed(0), profit: p.price - p.cost_price }))
+      .sort((a, b) => b.profit - a.profit)
+      .slice(0, 5)
+
+    return `
+📊 DATOS EN TIEMPO REAL DEL NEGOCIO (${now.toLocaleDateString('es-AR')} ${now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}):
+
+💰 HOY:
+• ${todayCount} ventas | Total: $${todayTotal.toLocaleString('es-AR')} | Costo: $${todayCost.toLocaleString('es-AR')} | Ganancia: $${todayProfit.toLocaleString('es-AR')}
+• Efectivo: $${todayEfectivo.toLocaleString('es-AR')} | Transferencia: $${todayTransf.toLocaleString('es-AR')} | Fiado: $${todayDeudor.toLocaleString('es-AR')}
+
+📅 ÚLTIMOS 7 DÍAS:
+• ${weekCount} ventas | Total: $${weekTotal.toLocaleString('es-AR')} | Ganancia: $${weekProfit.toLocaleString('es-AR')}
+• Promedio diario: $${Math.round(weekTotal / 7).toLocaleString('es-AR')}
+
+📆 ESTE MES:
+• ${monthCount} ventas | Total: $${monthTotal.toLocaleString('es-AR')} | Ganancia neta: $${(monthProfit - monthExpenses).toLocaleString('es-AR')}
+• Gastos del mes: $${monthExpenses.toLocaleString('es-AR')}
+
+📦 INVENTARIO:
+• ${(products || []).length} productos kiosco | ${(buffetProducts || []).length} productos buffet
+• ⚠️ ${lowStock.length} productos con stock bajo: ${lowStock.slice(0, 5).map(p => `${p.name} (${p.stock})`).join(', ') || 'Ninguno'}
+• 🚫 ${outOfStock.length} sin stock: ${outOfStock.slice(0, 5).map(p => p.name).join(', ') || 'Ninguno'}
+• 🍔 Buffet bajo stock: ${buffetLowStock.map(p => `${p.name} (${p.stock})`).join(', ') || 'Todo OK'}
+
+💳 DEUDORES:
+• ${activeDebtors.length} deudores activos | Deuda total: $${totalDebt.toLocaleString('es-AR')}
+${activeDebtors.slice(0, 5).map(d => `  - ${d.name}: $${d.total_debt.toLocaleString('es-AR')}`).join('\n')}
+
+🏆 TOP 5 PRODUCTOS POR MARGEN:
+${prodWithMargin.map((p, i) => `  ${i + 1}. ${p.name}: ${p.margin}% margen ($${p.profit} ganancia/u)`).join('\n')}
+`
+  } catch (err) {
+    console.error('Error fetching business context:', err)
+    return '(No se pudieron obtener datos del negocio en este momento)'
+  }
+}
 
 export async function askGroq(messages, systemContext = '') {
   const systemMsg = systemContext
-    ? `${SYSTEM_PROMPT}\n\nContexto adicional: ${systemContext}`
+    ? `${SYSTEM_PROMPT}\n\n${systemContext}`
     : SYSTEM_PROMPT
 
   const response = await fetch(GROQ_API_URL, {
@@ -46,8 +172,8 @@ export async function askGroq(messages, systemContext = '') {
         { role: 'system', content: systemMsg },
         ...messages
       ],
-      temperature: 0.7,
-      max_tokens: 600
+      temperature: 0.6,
+      max_tokens: 1200
     })
   })
 
@@ -75,7 +201,7 @@ export async function askGroq(messages, systemContext = '') {
 }
 
 export async function streamGroq(messages, onChunk, systemContext = '') {
-  const systemMsg = systemContext ? `${SYSTEM_PROMPT}\n\nContexto: ${systemContext}` : SYSTEM_PROMPT
+  const systemMsg = systemContext ? `${SYSTEM_PROMPT}\n\n${systemContext}` : SYSTEM_PROMPT
 
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',
@@ -86,11 +212,16 @@ export async function streamGroq(messages, onChunk, systemContext = '') {
     body: JSON.stringify({
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: systemMsg }, ...messages],
-      temperature: 0.7,
-      max_tokens: 600,
+      temperature: 0.6,
+      max_tokens: 1200,
       stream: true
     })
   })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.error?.message || 'Error al conectar con IA')
+  }
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -115,5 +246,16 @@ export async function streamGroq(messages, onChunk, systemContext = '') {
     }
   }
 
-  return full
+  // Parse action from full response
+  const actionMatch = full.match(/```action\n([\s\S]*?)\n```/)
+  let action = null
+  let text = full
+  if (actionMatch) {
+    try {
+      action = JSON.parse(actionMatch[1])
+      text = full.replace(/```action\n[\s\S]*?\n```/, '').trim()
+    } catch {}
+  }
+
+  return { text, action }
 }
