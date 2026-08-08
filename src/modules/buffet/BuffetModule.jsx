@@ -711,7 +711,26 @@ export default function BuffetModule() {
             <label className="form-label">Nombre del cliente (opcional)</label>
             <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Ej: Juan..." />
           </div>
-          <label className="form-label">Productos buffet disponibles</label>
+          
+          <div className="form-group">
+            <label className="form-label">Escanear producto</label>
+            <BarcodeScanner 
+              onScan={(code) => {
+                const found = buffetProducts.find(p => p.barcode === code)
+                if (found) {
+                  addToOrderCart(found)
+                  toast(`Agregado: ${found.name}`, 'success')
+                } else {
+                  toast(`Código no encontrado: ${code}`, 'warning')
+                }
+              }} 
+              active={orderModal.open} 
+              showCamera={true}
+              autoStart={orderModal.open}
+            />
+          </div>
+
+          <label className="form-label">O seleccionar manualmente</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {buffetProducts.map(bp => (
               <button
