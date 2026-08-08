@@ -3,11 +3,11 @@ import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
   dbGetIngredients, dbCreateIngredient, dbUpdateIngredient, dbDeleteIngredient,
-  dbSetBuffetIngredients, dbGetBuffetOrders,
+  dbSetBuffetIngredients, dbGetBuffetOrders, dbGetProducts, dbSetBuffetProductComponents,
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import {  Coffee, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Clock, Check, X , ClipboardList, Utensils, Package as PkgIcon, User } from 'lucide-react'
+import { Coffee, Plus, Edit2, Trash2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle } from 'lucide-react'
 
 function formatMoney(n) { return `$${Number(n || 0).toLocaleString('es-AR')}` }
 function formatTime(d) { return new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }
@@ -24,12 +24,13 @@ export default function BuffetModule() {
   const [tab, setTab] = useState('productos') // productos | pedidos | ingredientes
   const [buffetProducts, setBuffetProducts] = useState([])
   const [ingredients, setIngredients] = useState([])
+  const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState(null)
 
   const [productModal, setProductModal] = useState({ open: false, edit: null })
-  const [form, setForm] = useState({ name: '', price: '', cost_price: '', description: '', ingredients: [] })
+  const [productTypeTab, setProductTypeTab] = useState('simple') // 'simple' | 'combo'
+  const [form, setForm] = useState({ name: '', barcode: '', price: '', cost_price: '', stock: '', min_stock: '', description: '', ingredients: [], components: [] })
   const [saving, setSaving] = useState(false)
 
   const [orderModal, setOrderModal] = useState({ open: false })
@@ -42,14 +43,16 @@ export default function BuffetModule() {
   async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
     if (showLoading) setLoading(true)
-    const [bp, ings, ord] = await Promise.all([
+    const [bp, ings, ord, stdProds] = await Promise.all([
       dbGetBuffetProducts(tenantId),
       dbGetIngredients(tenantId),
-      dbGetBuffetOrders(tenantId)
+      dbGetBuffetOrders(tenantId),
+      dbGetProducts(tenantId)
     ])
     setBuffetProducts(bp)
     setIngredients(ings)
     setOrders(ord)
+    setProducts(stdProds)
     if (showLoading) setLoading(false)
   }
 
@@ -58,42 +61,69 @@ export default function BuffetModule() {
     if (!tenantId) return
     const channel = sb.channel('buffet_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'buffet_orders', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'buffet_products', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'buffet_product_components', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .subscribe()
     return () => { sb.removeChannel(channel) }
   }, [tenantId])
 
   function openCreate() {
-    setForm({ name: '', price: '', cost_price: '', description: '', ingredients: [] })
+    setForm({ name: '', barcode: '', price: '', cost_price: '', stock: '', min_stock: '', description: '', ingredients: [], components: [] })
+    setProductTypeTab('simple')
     setProductModal({ open: true, edit: null })
   }
 
   function openEdit(bp) {
     setForm({
       name: bp.name || '',
+      barcode: bp.barcode || '',
       price: bp.price || '',
       cost_price: bp.cost_price || '',
+      stock: bp.stock ?? '',
+      min_stock: bp.min_stock ?? '',
       description: bp.description || '',
       ingredients: (bp.buffet_ingredients || []).map(i => ({
         ingredient_id: i.ingredient_id,
         quantity: i.quantity,
         unit: i.unit || 'unidad',
         name: i.ingredients?.name
+      })),
+      components: (bp.buffet_product_components || []).map(c => ({
+        is_buffet: !!c.component_buffet_product_id,
+        component_id: c.component_buffet_product_id || c.component_product_id,
+        quantity: c.quantity,
+        name: c.products?.name || c.buffet_products?.name || 'Desconocido',
+        cost: c.products?.cost_price || c.buffet_products?.cost_price || 0
       }))
     })
+    setProductTypeTab(bp.is_composite ? 'combo' : 'simple')
     setProductModal({ open: true, edit: bp })
   }
 
   async function handleSave() {
     if (!form.name.trim()) return toast('El nombre es obligatorio', 'warning')
     if (!form.price) return toast('El precio es obligatorio', 'warning')
+    
+    if (form.barcode && form.barcode.trim()) {
+      const existing = buffetProducts.find(p => p.barcode === form.barcode.trim() && p.id !== productModal.edit?.id)
+      if (existing) {
+        return toast(`El código de barras ya existe en el producto "${existing.name}". Usa otro.`, 'error')
+      }
+    }
+
     setSaving(true)
     try {
+      const is_composite = productTypeTab === 'combo'
       const payload = {
         tenant_id: tenantId,
         name: form.name.trim(),
+        barcode: form.barcode.trim() || null,
         price: parseFloat(form.price),
         cost_price: form.cost_price ? parseFloat(form.cost_price) : 0,
+        stock: is_composite ? null : (form.stock !== '' ? parseInt(form.stock) : null),
+        min_stock: is_composite ? null : (form.min_stock !== '' ? parseInt(form.min_stock) : null),
         description: form.description || null,
+        is_composite,
         is_active: true
       }
       let id
@@ -101,16 +131,27 @@ export default function BuffetModule() {
         const updated = await dbUpdateBuffetProduct(productModal.edit.id, payload)
         id = updated.id
         await dbLogActivity(tenantId, userInfo?.id, 'update', 'buffet_product', id, { name: form.name.trim() })
-        toast('Producto buffet actualizado', 'success')
+        toast('Producto actualizado', 'success')
       } else {
         const created = await dbCreateBuffetProduct(payload)
         id = created.id
         await dbLogActivity(tenantId, userInfo?.id, 'create', 'buffet_product', id, { name: form.name.trim() })
-        toast('Producto buffet creado', 'success')
+        toast('Producto creado', 'success')
       }
-      await dbSetBuffetIngredients(id, form.ingredients)
+      
+      if (is_composite) {
+        await dbSetBuffetProductComponents(id, form.components, tenantId)
+        await dbSetBuffetIngredients(id, [])
+        // Calculate cost based on components
+        const totalCost = form.components.reduce((acc, c) => acc + (parseFloat(c.cost || 0) * c.quantity), 0)
+        await dbUpdateBuffetProduct(id, { cost_price: totalCost })
+      } else {
+        await dbSetBuffetIngredients(id, form.ingredients)
+        await dbSetBuffetProductComponents(id, [], tenantId)
+      }
+
       setProductModal({ open: false, edit: null })
-      load()
+      load(false)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
     } finally {
@@ -118,31 +159,35 @@ export default function BuffetModule() {
     }
   }
 
-  function addIngredient() {
-    setForm(f => ({
-      ...f,
-      ingredients: [...f.ingredients, { ingredient_id: '', quantity: 1, unit: 'unidad', name: '' }]
-    }))
-  }
-
+  // Ingredients helpers
+  function addIngredient() { setForm(f => ({ ...f, ingredients: [...f.ingredients, { ingredient_id: '', quantity: 1, unit: 'unidad', name: '' }] })) }
   function updateIngredient(i, field, value) {
     setForm(f => {
-      const updated = [...f.ingredients]
-      updated[i] = { ...updated[i], [field]: value }
+      const updated = [...f.ingredients]; updated[i] = { ...updated[i], [field]: value }
       if (field === 'ingredient_id') {
         const found = ingredients.find(p => p.id === value)
-        if (found) {
-          updated[i].name = found.name
-          updated[i].unit = found.unit
-        }
+        if (found) { updated[i].name = found.name; updated[i].unit = found.unit }
       }
       return { ...f, ingredients: updated }
     })
   }
+  function removeIngredient(i) { setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, idx) => idx !== i) })) }
 
-  function removeIngredient(i) {
-    setForm(f => ({ ...f, ingredients: f.ingredients.filter((_, idx) => idx !== i) }))
+  // Components helpers
+  function addComponent() { setForm(f => ({ ...f, components: [...f.components, { is_buffet: false, component_id: '', quantity: 1, name: '', cost: 0 }] })) }
+  function updateComponent(i, field, value) {
+    setForm(f => {
+      const updated = [...f.components]; updated[i] = { ...updated[i], [field]: value }
+      if (field === 'component_id' || field === 'is_buffet') {
+        const isBuf = updated[i].is_buffet
+        const list = isBuf ? buffetProducts : products
+        const found = list.find(p => p.id === updated[i].component_id)
+        if (found) { updated[i].name = found.name; updated[i].cost = found.cost_price || 0 }
+      }
+      return { ...f, components: updated }
+    })
   }
+  function removeComponent(i) { setForm(f => ({ ...f, components: f.components.filter((_, idx) => idx !== i) })) }
 
   // ===== INGREDIENTS CRUD =====
   function openIngCreate() {
@@ -238,6 +283,21 @@ export default function BuffetModule() {
 
   const activeOrders = orders.filter(o => o.status !== 'delivered')
 
+  const getDisplayCost = (p) => {
+    if (p.is_composite) {
+      return (p.buffet_product_components || []).reduce((acc, c) => {
+        const cost = c.products?.cost_price || c.buffet_products?.cost_price || 0
+        return acc + (cost * c.quantity)
+      }, 0)
+    }
+    return p.cost_price || 0
+  }
+
+  const getDisplayStock = (p) => {
+    if (p.is_composite) return null // Combos don't have stock themselves, it's calculated on demand
+    return p.stock
+  }
+
   return (
     <div className="fade-in">
       <div className="module-header">
@@ -253,7 +313,7 @@ export default function BuffetModule() {
           )}
           {tab === 'productos' && isAdmin() && (
             <button onClick={openCreate} className="btn btn-primary">
-              <Plus size={16} /> Nuevo producto
+              <Plus size={16} /> Nuevo producto buffet
             </button>
           )}
           {tab === 'ingredientes' && isAdmin() && (
@@ -269,8 +329,8 @@ export default function BuffetModule() {
         <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
           {[
             { id: 'pedidos', label: `📋 Pedidos ${activeOrders.length > 0 ? `(${activeOrders.length})` : ''}` },
-            { id: 'productos', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><Utensils size={16}/> Productos Preparados</span> },
-            { id: 'ingredientes', label: '🥗 Ingredientes (Stock)' }
+            { id: 'productos', label: <span style={{display:'flex', alignItems:'center', gap:'6px'}}><Utensils size={16}/> Stock & Productos Buffet</span> },
+            { id: 'ingredientes', label: '🥗 Ingredientes' }
           ].map(t => (
             <button
               key={t.id}
@@ -286,52 +346,70 @@ export default function BuffetModule() {
         {loading ? (
           <div className="empty-state"><div className="spinner" /></div>
         ) : tab === 'productos' ? (
-          /* ===== PRODUCTOS BUFFET ===== */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '14px' }}>
-            {buffetProducts.length === 0 ? (
-              <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-                <Coffee size={40} />
-                <h3>Sin productos buffet</h3>
-                <p>Creá productos con ingredientes para gestionar el buffet</p>
-              </div>
-            ) : buffetProducts.map(bp => (
-              <div key={bp.id} className="card" style={{ cursor: 'pointer' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '1rem' }}>{bp.name}</div>
-                    {bp.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{bp.description}</div>}
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: 'var(--accent)', fontWeight: 700 }}>{formatMoney(bp.price)}</div>
-                    {bp.cost_price > 0 && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Costo: {formatMoney(bp.cost_price)}</div>}
-                  </div>
-                </div>
-
-                {/* Ingredientes */}
-                {(bp.buffet_ingredients || []).length > 0 && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Ingredientes
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                      {bp.buffet_ingredients.map((ing, i) => (
-                        <span key={i} className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
-                          {ing.quantity} {ing.unit} {ing.products?.name}
+          /* ===== PRODUCTOS BUFFET (TABLE VIEW) ===== */
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Código</th>
+                  <th style={{ textAlign: 'right' }}>Precio</th>
+                  <th style={{ textAlign: 'right' }}>Costo</th>
+                  <th style={{ textAlign: 'right' }}>Stock</th>
+                  <th>Tipo</th>
+                  {isAdmin() && <th>Acciones</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {buffetProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdmin() ? 7 : 6}>
+                      <div className="empty-state">
+                        <Coffee size={32} />
+                        <p>Sin productos en buffet</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : buffetProducts.map(bp => {
+                  const dispStock = getDisplayStock(bp)
+                  const isLowStock = !bp.is_composite && bp.stock !== null && bp.min_stock !== null && bp.stock <= bp.min_stock
+                  return (
+                    <tr key={bp.id}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{bp.name}</div>
+                        {bp.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{bp.description}</div>}
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {bp.barcode || '—'}
                         </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {isAdmin() && (
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                    <button onClick={() => openEdit(bp)} className="btn btn-secondary btn-sm">
-                      <Edit2 size={12} /> Editar
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--accent)' }}>{formatMoney(bp.price)}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>{formatMoney(getDisplayCost(bp))}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span style={{ color: isLowStock ? 'var(--danger)' : 'var(--text-primary)', fontWeight: isLowStock ? 700 : 400 }}>
+                          {dispStock ?? '—'}
+                          {isLowStock && <AlertTriangle size={14} style={{marginLeft: 6, color:'var(--warning)'}}/>}
+                        </span>
+                      </td>
+                      <td>
+                        {bp.is_composite 
+                          ? <span className="badge badge-primary" style={{ fontSize: '0.65rem' }}>Combo</span>
+                          : <span className="badge badge-neutral" style={{ fontSize: '0.65rem' }}>Simple</span>
+                        }
+                      </td>
+                      {isAdmin() && (
+                        <td>
+                          <button onClick={() => openEdit(bp)} className="btn btn-secondary btn-sm">
+                            <Edit2 size={12} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         ) : tab === 'ingredientes' ? (
           /* ===== INGREDIENTES ===== */
@@ -445,11 +523,32 @@ export default function BuffetModule() {
           </>
         }
       >
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)', width: 'fit-content' }}>
+          <button
+            onClick={() => setProductTypeTab('simple')}
+            className={`btn btn-sm ${productTypeTab === 'simple' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ border: 'none' }}
+          >
+            Producto Simple
+          </button>
+          <button
+            onClick={() => setProductTypeTab('combo')}
+            className={`btn btn-sm ${productTypeTab === 'combo' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ border: 'none' }}
+          >
+            Combo / Compuesto
+          </button>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="form-row">
-            <div className="form-group" style={{ gridColumn: '1/-1' }}>
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
               <label className="form-label">Nombre *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Hamburguesa completa" autoFocus />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Código (Opcional)</label>
+              <input value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} placeholder="Código de barras..." />
             </div>
           </div>
           <div className="form-row">
@@ -458,53 +557,112 @@ export default function BuffetModule() {
               <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" min="0" />
             </div>
             <div className="form-group">
-              <label className="form-label">Costo total</label>
-              <input type="number" value={form.cost_price} onChange={e => setForm(f => ({ ...f, cost_price: e.target.value }))} placeholder="0.00" min="0" />
+              <label className="form-label">Costo total {productTypeTab === 'combo' && '(Calculado auto)'}</label>
+              <input type="number" value={form.cost_price} onChange={e => setForm(f => ({ ...f, cost_price: e.target.value }))} placeholder="0.00" min="0" disabled={productTypeTab === 'combo'} />
             </div>
           </div>
+          
+          {productTypeTab === 'simple' && (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Stock Actual</label>
+                <input type="number" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Stock Mínimo</label>
+                <input type="number" value={form.min_stock} onChange={e => setForm(f => ({ ...f, min_stock: e.target.value }))} placeholder="0" />
+              </div>
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Descripción</label>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descripción breve..." />
           </div>
 
-          {/* Ingredientes */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <label className="form-label">Ingredientes</label>
-              <button type="button" onClick={addIngredient} className="btn btn-secondary btn-sm">
-                <Plus size={12} /> Agregar
-              </button>
-            </div>
-            {form.ingredients.map((ing, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                <select
-                  value={ing.ingredient_id}
-                  onChange={e => updateIngredient(i, 'ingredient_id', e.target.value)}
-                  style={{ flex: 2 }}
-                >
-                  <option value="">Seleccionar ingrediente...</option>
-                  {ingredients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <input
-                  type="number"
-                  value={ing.quantity}
-                  onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value))}
-                  style={{ width: '70px' }}
-                  min="0" step="0.5"
-                />
-                <select
-                  value={ing.unit}
-                  onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                  style={{ width: '100px' }}
-                >
-                  {['unidad', 'gramos', 'ml', 'porciones'].map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-                <button type="button" onClick={() => removeIngredient(i)} className="btn btn-danger btn-sm">
-                  <X size={12} />
+          {productTypeTab === 'simple' ? (
+            /* Ingredientes */
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label className="form-label">Ingredientes de preparación</label>
+                <button type="button" onClick={addIngredient} className="btn btn-secondary btn-sm">
+                  <Plus size={12} /> Agregar ingrediente
                 </button>
               </div>
-            ))}
-          </div>
+              {form.ingredients.map((ing, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                  <select
+                    value={ing.ingredient_id}
+                    onChange={e => updateIngredient(i, 'ingredient_id', e.target.value)}
+                    style={{ flex: 2 }}
+                  >
+                    <option value="">Seleccionar ingrediente...</option>
+                    {ingredients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    value={ing.quantity}
+                    onChange={e => updateIngredient(i, 'quantity', parseFloat(e.target.value))}
+                    style={{ width: '70px' }}
+                    min="0" step="0.5"
+                  />
+                  <select
+                    value={ing.unit}
+                    onChange={e => updateIngredient(i, 'unit', e.target.value)}
+                    style={{ width: '100px' }}
+                  >
+                    {['unidad', 'gramos', 'ml', 'porciones'].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <button type="button" onClick={() => removeIngredient(i)} className="btn btn-danger btn-sm">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Componentes de Combo */
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label className="form-label">Componentes del Combo</label>
+                <button type="button" onClick={addComponent} className="btn btn-secondary btn-sm">
+                  <Plus size={12} /> Agregar producto
+                </button>
+              </div>
+              {form.components.map((c, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                  <select
+                    value={c.is_buffet ? 'buffet' : 'standard'}
+                    onChange={e => {
+                      updateComponent(i, 'is_buffet', e.target.value === 'buffet');
+                      updateComponent(i, 'component_id', '');
+                    }}
+                    style={{ width: '120px' }}
+                  >
+                    <option value="buffet">Buffet</option>
+                    <option value="standard">Kiosco</option>
+                  </select>
+                  <select
+                    value={c.component_id}
+                    onChange={e => updateComponent(i, 'component_id', e.target.value)}
+                    style={{ flex: 2 }}
+                  >
+                    <option value="">Seleccionar producto...</option>
+                    {(c.is_buffet ? buffetProducts : products).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    value={c.quantity}
+                    onChange={e => updateComponent(i, 'quantity', parseInt(e.target.value))}
+                    style={{ width: '70px' }}
+                    min="1"
+                  />
+                  <button type="button" onClick={() => removeComponent(i)} className="btn btn-danger btn-sm">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -528,7 +686,7 @@ export default function BuffetModule() {
             <label className="form-label">Nombre del cliente (opcional)</label>
             <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Ej: Juan..." />
           </div>
-          <label className="form-label">Productos disponibles</label>
+          <label className="form-label">Productos buffet disponibles</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {buffetProducts.map(bp => (
               <button
@@ -540,8 +698,6 @@ export default function BuffetModule() {
                   cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-soft)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-tertiary)' }}
               >
                 <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{bp.name}</span>
                 <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{formatMoney(bp.price)}</span>
