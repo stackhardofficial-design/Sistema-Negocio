@@ -70,7 +70,7 @@ async function handleUpdateStock(action, tenantId, userId) {
       amount: action.expense_amount,
       description: action.expense_description || 'Compra de mercadería (vía IA)',
       category_id: catId,
-      date: new Date().toISOString().split('T')[0]
+      expense_date: new Date().toISOString().split('T')[0]
     })
     results.push(`💰 Gasto registrado: $${Number(action.expense_amount).toLocaleString('es-AR')}`)
   }
@@ -111,7 +111,7 @@ async function handleCreateExpense(action, tenantId, userId) {
     amount: action.amount,
     description: action.description || 'Gasto registrado vía IA',
     category_id: catId,
-    date: new Date().toISOString().split('T')[0]
+    expense_date: new Date().toISOString().split('T')[0]
   })
 
   await dbLogActivity(tenantId, userId, 'create', 'expense', null, {

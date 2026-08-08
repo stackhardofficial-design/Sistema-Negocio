@@ -39,10 +39,12 @@ Podés ejecutar estas acciones incluyendo un bloque \`\`\`action al final (invis
 Antes de ejecutar, SIEMPRE preguntá:
 - ¿Se registra como gasto (compra de mercadería)?
 - ¿Cuántas unidades de cada producto?
-- Si es gasto: ¿cuál fue el monto total de la compra?
+- Si es gasto, calculá automáticamente el monto usando el *Precio de Costo* de la lista de productos y preguntale al usuario si ese monto es correcto o si pagó otro monto.
+
+**Razonamiento Inteligente:** Cuando el usuario diga un nombre (ej: "coca"), buscá en la lista de productos la coincidencia más lógica (ej: "Coca Cola 500ml") y usá ese nombre exacto en la acción y para calcular el costo.
 
 \`\`\`action
-{"type": "update_stock", "items": [{"name": "Alfajor Triple", "quantity": 50}, {"name": "Coca Cola 500ml", "quantity": 24}], "register_expense": true, "expense_amount": 15000, "expense_description": "Compra de mercadería"}
+{"type": "update_stock", "items": [{"name": "Coca Cola 500ml", "quantity": 24}], "register_expense": true, "expense_amount": 15000, "expense_description": "Compra de mercadería"}
 \`\`\`
 
 ## 3. Crear un producto nuevo
@@ -207,6 +209,9 @@ ${activeDebtors.slice(0, 5).map(d => `  - ${d.name}: $${d.total_debt.toLocaleStr
 
 🏆 TOP 5 PRODUCTOS POR MARGEN:
 ${prodWithMargin.map((p, i) => `  ${i + 1}. ${p.name}: ${p.margin}% margen ($${p.profit} ganancia/u)`).join('\n')}
+
+🛒 CATÁLOGO COMPLETO DE PRODUCTOS (Usa esto para entender nombres, deducir de qué producto habla el usuario y calcular costos):
+${(products || []).map(p => `- ${p.name} (Costo: $${p.cost_price || 0}, Precio: $${p.price || 0}, Stock: ${p.stock || 0})`).join('\n')}
 `
   } catch (err) {
     console.error('Error fetching business context:', err)
