@@ -736,8 +736,9 @@ export default function ProductosModule() {
               borderRadius: 'var(--radius-md)', fontSize: '0.85rem',
               display: 'flex', gap: '20px'
             }}>
-              <span>Ganancia: <strong style={{ color: 'var(--success)' }}>{formatMoney(form.price - form.cost_price)}</strong></span>
-              <span>Margen: <strong style={{ color: 'var(--success)' }}>{(((form.price - form.cost_price) / form.price) * 100).toFixed(1)}%</strong></span>
+              <span title="Ganancia neta (Pesos)">Ganancia: <strong style={{ color: 'var(--success)' }}>{formatMoney(form.price - form.cost_price)}</strong></span>
+              <span title="Ganancia sobre costo (Markup)">Ganancia %: <strong style={{ color: 'var(--success)' }}>{(((form.price - form.cost_price) / form.cost_price) * 100).toFixed(1)}%</strong></span>
+              <span title="Margen sobre venta">Margen: <strong style={{ color: 'var(--success)' }}>{(((form.price - form.cost_price) / form.price) * 100).toFixed(1)}%</strong></span>
             </div>
           )}
 
