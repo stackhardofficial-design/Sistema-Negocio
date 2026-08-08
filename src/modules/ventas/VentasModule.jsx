@@ -355,7 +355,8 @@ export default function VentasModule() {
       toast('Seleccioná el método de pago antes de escanear', 'warning')
       return
     }
-    if (barcodeInput.trim()) handleScan(barcodeInput.trim())
+    const val = (barcodeRef.current?.value || barcodeInput).trim()
+    if (val) handleScan(val)
   }
 
   function adjustQty(delta) {
