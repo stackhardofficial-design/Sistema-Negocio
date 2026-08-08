@@ -20,6 +20,7 @@ import HistorialModule from './modules/historial/HistorialModule.jsx'
 import SuperAdminModule from './modules/superadmin/SuperAdminModule.jsx'
 import ConfiguracionModule from './modules/configuracion/ConfiguracionModule.jsx'
 import FinanzasModule from './modules/finanzas/FinanzasModule.jsx'
+import IAModule from './modules/ia/IAModule.jsx'
 import './index.css'
 
 
@@ -117,6 +118,7 @@ function AppShell() {
           <Route path="/historial" element={<HistorialModule />} />
           <Route path="/superadmin" element={<SuperAdminModule />} />
           <Route path="/configuracion" element={<ConfiguracionModule />} />
+          <Route path="/ia" element={<IAModule />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

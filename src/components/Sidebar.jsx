@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Layers,
   Coffee, Users, ClipboardList, Settings, LogOut,
   ChevronLeft, ChevronRight, ShoppingBag, Crown,
-  BookOpen, TrendingUp, Receipt
+  BookOpen, TrendingUp, Receipt, Bot
 } from 'lucide-react'
 import { dbLogout, dbLogActivity } from '../lib/supabase'
 
@@ -19,6 +19,7 @@ const MENU_ITEMS = [
   { id: 'deudores', label: 'Deudores', icon: BookOpen, roles: [] },
   { id: 'empleados', label: 'Empleados', icon: Users, roles: ['admin', 'super_admin'] },
   { id: 'historial', label: 'Historial', icon: ClipboardList, roles: ['admin', 'super_admin'] },
+  { id: 'ia', label: 'Asistente IA', icon: Bot, roles: [] },
   { id: 'superadmin', label: 'Super Admin', icon: Crown, roles: ['super_admin'] },
   { id: 'configuracion', label: 'Configuración', icon: Settings, roles: ['admin', 'super_admin'] },
 ]
