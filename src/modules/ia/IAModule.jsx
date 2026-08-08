@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useApp } from '../../lib/AppContext'
 import { streamGroq, fetchBusinessContext } from '../../lib/groq'
-import { useLocation } from 'react-router-dom'
+import { executeAIAction } from '../../lib/aiActions'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Bot, Send, Loader, Sparkles, Plus, MessageSquare,
-  Trash2, Clock, TrendingUp, Package, DollarSign, AlertTriangle, Users
+  Trash2, Clock, TrendingUp, Package, DollarSign, AlertTriangle, Users, CheckCircle
 } from 'lucide-react'
 
 // ── Helpers ──
@@ -39,6 +40,7 @@ const QUICK_ACTIONS = [
 
 export default function IAModule() {
   const { tenantId, userInfo, tenant } = useApp()
+  const navigate = useNavigate()
   const location = useLocation()
 
   const [chats, setChats] = useState(() => loadChats())
@@ -47,6 +49,7 @@ export default function IAModule() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [executingAction, setExecutingAction] = useState(false)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -79,6 +82,29 @@ export default function IAModule() {
     })
   }, [activeChatId])
 
+  async function handleExecuteAction(msgIndex, action) {
+    if (!action || executingAction) return
+    setExecutingAction(true)
+    try {
+      const result = await executeAIAction(action, tenantId, userInfo.id)
+      
+      setMessages(prev => {
+        const newMsgs = [...prev]
+        newMsgs[msgIndex] = { ...newMsgs[msgIndex], actionExecuted: true, actionResult: result.message, actionSuccess: result.success }
+        saveCurrentChat(newMsgs)
+        return newMsgs
+      })
+
+      if (result.success && result.navigate) {
+        setTimeout(() => navigate('/' + result.navigate), 500)
+      }
+    } catch (err) {
+      alert('Error ejecutando acción: ' + err.message)
+    } finally {
+      setExecutingAction(false)
+    }
+  }
+
   async function sendMessage(text) {
     const msg = (text || input).trim()
     if (!msg || loading) return
@@ -103,7 +129,10 @@ export default function IAModule() {
       )
       setMessages(prev => {
         const f = [...prev]
-        if (f.length > 0) f[f.length - 1].content = f[f.length - 1].content.replace(/```action\n[\s\S]*?\n```/g, '').trim()
+        if (f.length > 0) {
+          f[f.length - 1].content = f[f.length - 1].content.replace(/```action\n[\s\S]*?\n```/g, '').trim()
+          if (action) f[f.length - 1].action = action
+        }
         saveCurrentChat(f)
         return f
       })
@@ -246,10 +275,32 @@ export default function IAModule() {
                 color: msg.role === 'user' ? '#0f1117' : 'var(--text-primary)',
                 fontSize: '0.85rem', lineHeight: '1.6',
                 border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none'
-              }}
-                dangerouslySetInnerHTML={msg.role === 'assistant' ? { __html: renderMarkdown(msg.content) || '<span style="opacity:0.4">…</span>' } : undefined}
-              >
-                {msg.role === 'user' ? msg.content : undefined}
+              }}>
+                {msg.role === 'assistant' ? (
+                  <>
+                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) || '<span style="opacity:0.4">…</span>' }} />
+                    {msg.action && !msg.actionExecuted && (
+                      <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px dashed var(--accent)' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle size={14} color="var(--accent)" /> Acción Solicitada
+                        </div>
+                        <div style={{ fontSize: '0.75rem', marginBottom: '10px', color: 'var(--text-muted)' }}>
+                          {msg.action.type === 'update_stock' ? 'Se va a actualizar el stock.' : msg.action.type === 'create_product' ? 'Se va a crear un nuevo producto.' : msg.action.type === 'create_expense' ? 'Se va a registrar un gasto.' : msg.action.type === 'update_price' ? 'Se va a actualizar el precio.' : msg.action.type === 'navigate' ? `Navegar a ${msg.action.module}` : 'Se ejecutará una acción en el sistema.'}
+                        </div>
+                        <button onClick={() => handleExecuteAction(i, msg.action)} disabled={executingAction} className="btn btn-primary" style={{ width: '100%', padding: '8px', display: 'flex', justifyContent: 'center', gap: '6px', fontSize: '0.8rem' }}>
+                          {executingAction ? <Loader size={14} className="spinning" /> : <Sparkles size={14} />} Confirmar y Ejecutar
+                        </button>
+                      </div>
+                    )}
+                    {msg.actionExecuted && (
+                      <div style={{ marginTop: '12px', padding: '10px', background: msg.actionSuccess ? 'var(--success-soft)' : 'var(--danger-soft)', color: msg.actionSuccess ? 'var(--success)' : 'var(--danger)', borderRadius: '8px', fontSize: '0.75rem', whiteSpace: 'pre-wrap', border: `1px solid ${msg.actionSuccess ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}` }}>
+                        {msg.actionResult}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  msg.content
+                )}
               </div>
             </div>
           ))}
