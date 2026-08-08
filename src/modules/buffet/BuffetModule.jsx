@@ -559,20 +559,20 @@ export default function BuffetModule() {
           </div>
 
           <label className="form-label">O seleccionar manualmente</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
             {buffetProducts.map(bp => (
               <button
                 key={bp.id}
                 onClick={() => addToOrderCart(bp)}
                 style={{
-                  padding: '10px 14px', background: 'var(--bg-tertiary)',
+                  padding: '12px 14px', background: 'var(--bg-tertiary)',
                   border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
                   cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start'
                 }}
               >
-                <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{bp.name}</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{formatMoney(bp.price)}</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: '1.3' }}>{bp.name}</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '0.95rem' }}>{formatMoney(bp.price)}</span>
               </button>
             ))}
           </div>
