@@ -22,7 +22,7 @@ function playBeep() {
     gain.gain.setValueAtTime(0.1, ctx.currentTime)
     osc.start()
     osc.stop(ctx.currentTime + 0.1)
-  } catch(e) {
+  } catch (e) {
     console.error('Audio beep failed', e)
   }
 }
@@ -37,17 +37,17 @@ function IconEfectivo({ active }) {
   return (
     <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Billete */}
-      <rect x="3" y="10" width="30" height="18" rx="3" fill={active ? 'rgba(16,185,129,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.8"/>
+      <rect x="3" y="10" width="30" height="18" rx="3" fill={active ? 'rgba(16,185,129,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.8" />
       {/* Circulo central */}
-      <circle cx="18" cy="19" r="5" stroke={c} strokeWidth="1.6" fill={active ? 'rgba(16,185,129,0.12)' : 'none'}/>
+      <circle cx="18" cy="19" r="5" stroke={c} strokeWidth="1.6" fill={active ? 'rgba(16,185,129,0.12)' : 'none'} />
       {/* Signo $ */}
       <text x="18" y="23" textAnchor="middle" fontSize="7" fontWeight="bold" fill={c} fontFamily="system-ui">$</text>
       {/* Esquinas decorativas */}
-      <rect x="5" y="12" width="4" height="3" rx="1" fill={c} opacity="0.5"/>
-      <rect x="27" y="23" width="4" height="3" rx="1" fill={c} opacity="0.5"/>
+      <rect x="5" y="12" width="4" height="3" rx="1" fill={c} opacity="0.5" />
+      <rect x="27" y="23" width="4" height="3" rx="1" fill={c} opacity="0.5" />
       {/* Lineas decorativas */}
-      <line x1="5" y1="22" x2="9" y2="22" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
-      <line x1="27" y1="17" x2="31" y2="17" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
+      <line x1="5" y1="22" x2="9" y2="22" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4" />
+      <line x1="27" y1="17" x2="31" y2="17" stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.4" />
     </svg>
   )
 }
@@ -60,7 +60,7 @@ function IconMercadoPago({ active }) {
     <svg width="42" height="36" viewBox="0 0 42 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Fondo ovalado característico */}
       <ellipse cx="21" cy="18" rx="18" ry="12" fill={color} fillOpacity={opacityBg} />
-      
+
       {/* Contorno del óvalo */}
       <ellipse cx="21" cy="18" rx="18" ry="12" stroke={color} strokeWidth="1.5" />
 
@@ -73,17 +73,17 @@ function IconMercadoPago({ active }) {
 
       {/* Mano izquierda (silueta) */}
       <path d="M6 18 C8 17 12 16.5 15 16.5 C16 16.5 18 17 19 18 C20 19 20.5 20 20 21 C19 22 17 22.5 15 22.5 C13 22.5 11 21.5 10 21" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      
+
       {/* Dedos mano izquierda */}
       <path d="M12 21.5 C13 22.5 15 22.5 16 21.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
       <path d="M14 22 C15 23 16 23 17 22" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
 
       {/* Mano derecha (silueta) */}
       <path d="M36 18 C34 17.5 30 17 27 17 C25 17 23 16.5 22 17.5 C21 18.5 22 19.5 23 20.5 C24 21.5 26 21.5 28 20.5 C29 19.5 30 19.5 31 19" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      
+
       {/* Manga derecha */}
       <path d="M30 17 L29 19" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
-      
+
       {/* Pulgar */}
       <path d="M22 17.5 C20 18.5 21 20 22 20.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
     </svg>
@@ -95,17 +95,17 @@ function IconDeudor({ active }) {
   return (
     <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Libreta */}
-      <rect x="7" y="5" width="22" height="27" rx="3" fill={active ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.08)'} stroke={c} strokeWidth="1.7"/>
+      <rect x="7" y="5" width="22" height="27" rx="3" fill={active ? 'rgba(245,158,11,0.12)' : 'rgba(107,114,128,0.08)'} stroke={c} strokeWidth="1.7" />
       {/* Espiral izquierda */}
-      <line x1="7" y1="5" x2="7" y2="32" stroke={c} strokeWidth="3" strokeLinecap="round"/>
+      <line x1="7" y1="5" x2="7" y2="32" stroke={c} strokeWidth="3" strokeLinecap="round" />
       {/* Lineas de texto */}
-      <line x1="12" y1="13" x2="25" y2="13" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
-      <line x1="12" y1="18" x2="25" y2="18" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
-      <line x1="12" y1="23" x2="20" y2="23" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+      <line x1="12" y1="13" x2="25" y2="13" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+      <line x1="12" y1="18" x2="25" y2="18" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+      <line x1="12" y1="23" x2="20" y2="23" stroke={c} strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
       {/* Badge deuda */}
       {active && (
         <>
-          <circle cx="27" cy="9" r="5" fill="#f59e0b"/>
+          <circle cx="27" cy="9" r="5" fill="#f59e0b" />
           <text x="27" y="12.5" textAnchor="middle" fontSize="6.5" fontWeight="bold" fill="#0f1117" fontFamily="system-ui">$</text>
         </>
       )}
@@ -117,9 +117,9 @@ function IconMultipagos({ active }) {
   const c = active ? '#8b5cf6' : '#6b7280'
   return (
     <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="4" y="6" width="12" height="24" rx="2" fill={active ? 'rgba(139,92,246,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.5"/>
+      <rect x="4" y="6" width="12" height="24" rx="2" fill={active ? 'rgba(139,92,246,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.5" />
       <circle cx="10" cy="18" r="3" stroke={c} strokeWidth="1.2" />
-      <rect x="20" y="12" width="12" height="12" rx="2" fill={active ? 'rgba(139,92,246,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.5"/>
+      <rect x="20" y="12" width="12" height="12" rx="2" fill={active ? 'rgba(139,92,246,0.15)' : 'rgba(107,114,128,0.1)'} stroke={c} strokeWidth="1.5" />
       <path d="M16 18 H20" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
       <text x="10" y="19.5" textAnchor="middle" fontSize="5" fontWeight="bold" fill={c} fontFamily="system-ui">$</text>
       <text x="26" y="19.5" textAnchor="middle" fontSize="5" fontWeight="bold" fill={c} fontFamily="system-ui">MP</text>
@@ -187,7 +187,7 @@ export default function VentasModule() {
   const [loading, setLoading] = useState(false)
   const [flashSuccess, setFlashSuccess] = useState(false)
   const barcodeRef = useRef(null)
-  
+
   // ===== WAKE LOCK (Evitar que se apague la pantalla en móviles) =====
   const wakeLock = useRef(null)
 
@@ -320,7 +320,7 @@ export default function VentasModule() {
 
       setQuantity(1)
       setBarcodeInput('')
-      
+
       // Esperar 2 segundos antes de permitir el próximo escaneo
       setTimeout(() => {
         setLoading(false)
@@ -542,11 +542,10 @@ export default function VentasModule() {
                         background: selectedDebtor?.id === d.id
                           ? 'rgba(245,158,11,0.15)'
                           : 'var(--bg)',
-                        border: `2px solid ${
-                          selectedDebtor?.id === d.id
+                        border: `2px solid ${selectedDebtor?.id === d.id
                             ? 'rgba(245,158,11,0.5)'
                             : 'var(--border)'
-                        }`,
+                          }`,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -689,10 +688,9 @@ export default function VentasModule() {
         {/* ===== CÓDIGO DE BARRAS ===== */}
         <div style={{
           background: 'var(--bg-secondary)',
-          border: `2px solid ${
-            !canScan ? 'var(--border)' :
-            loading ? 'var(--accent)' : 'var(--border)'
-          }`,
+          border: `2px solid ${!canScan ? 'var(--border)' :
+              loading ? 'var(--accent)' : 'var(--border)'
+            }`,
           borderRadius: '16px',
           padding: '16px',
           transition: 'border-color 0.2s, opacity 0.2s, box-shadow 0.2s',
