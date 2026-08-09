@@ -108,7 +108,7 @@ export default function FinanzasModule() {
           expense_type: expenseForm.expense_type || 'variable'
         })
         await dbLogActivity(tenantId, userInfo?.id, 'create', 'expense', created.id, { amount: expenseForm.amount, category_id: expenseForm.category_id })
-        toast('Gasto registrado', 'success')
+        toast(expenseForm.expense_type === 'ingreso' ? 'Ingreso registrado' : 'Gasto registrado', 'success')
       }
       setExpenseModal({ open: false, edit: null })
       load()
@@ -163,10 +163,13 @@ export default function FinanzasModule() {
   }
 
   // ===== CÁLCULOS =====
-  const totalIngresos = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0)
-  const totalGastos = expenses.reduce((acc, e) => acc + Number(e.amount), 0)
-  const totalFijos = expenses.filter(e => e.expense_type === 'fixed').reduce((acc, e) => acc + Number(e.amount), 0)
-  const totalVariables = expenses.filter(e => !e.expense_type || e.expense_type === 'variable').reduce((acc, e) => acc + Number(e.amount), 0)
+  const ingresosExtra = expenses.filter(e => e.expense_type === 'ingreso').reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalIngresos = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0) + ingresosExtra
+  
+  const gastosReales = expenses.filter(e => e.expense_type !== 'ingreso')
+  const totalGastos = gastosReales.reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalFijos = gastosReales.filter(e => e.expense_type === 'fixed').reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalVariables = gastosReales.filter(e => !e.expense_type || e.expense_type === 'variable').reduce((acc, e) => acc + Number(e.amount), 0)
   const gananciaNeta = totalIngresos - totalGastos
 
   // Desglose de ingresos por método de pago
@@ -182,7 +185,7 @@ export default function FinanzasModule() {
     fechasUnicas.forEach(f => {
       const totalDia = expenses
         .filter(e => e.category_id === cat.id && e.expense_date === f)
-        .reduce((sum, e) => sum + Number(e.amount), 0)
+        .reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? Number(e.amount) : -Number(e.amount)), 0)
       row[f] = totalDia
       row.total += totalDia
     })
@@ -196,7 +199,7 @@ export default function FinanzasModule() {
     fechasUnicas.forEach(f => {
       const totalDia = gastosSinCat
         .filter(e => e.expense_date === f)
-        .reduce((sum, e) => sum + Number(e.amount), 0)
+        .reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? Number(e.amount) : -Number(e.amount)), 0)
       row[f] = totalDia
       row.total += totalDia
     })
@@ -462,7 +465,9 @@ export default function FinanzasModule() {
                                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--text-muted)' }}>-</td>
                                 </>
                               )}
-                              <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(exp.amount)}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: exp.expense_type === 'ingreso' ? 'var(--success)' : 'var(--text-primary)' }}>
+                                {exp.expense_type === 'ingreso' ? '+' : '-'}{formatMoney(exp.amount)}
+                              </td>
                               <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                                 <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
                                   <Trash2 size={16} />
@@ -507,12 +512,12 @@ export default function FinanzasModule() {
                           <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
                             <td style={{ padding: '12px 16px', fontWeight: 500 }}>{row.name}</td>
                             {fechasUnicas.map(f => (
-                              <td key={f} style={{ padding: '12px 16px', textAlign: 'right', color: row[f] > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                                {row[f] > 0 ? formatMoney(row[f]) : '-'}
+                              <td key={f} style={{ padding: '12px 16px', textAlign: 'right', color: row[f] !== 0 ? (row[f] > 0 ? 'var(--success)' : 'var(--text-primary)') : 'var(--text-muted)' }}>
+                                {row[f] !== 0 ? (row[f] > 0 ? '+' : '') + formatMoney(row[f]) : '-'}
                               </td>
                             ))}
-                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, background: 'var(--bg-secondary)' }}>
-                              {formatMoney(row.total)}
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, background: 'var(--bg-secondary)', color: row.total > 0 ? 'var(--success)' : row.total < 0 ? 'var(--danger)' : 'inherit' }}>
+                              {(row.total > 0 ? '+' : '') + formatMoney(row.total)}
                             </td>
                           </tr>
                         ))}
@@ -523,15 +528,16 @@ export default function FinanzasModule() {
                           {fechasUnicas.map(f => {
                             const totalDia = expenses
                               .filter(e => e.expense_date === f)
-                              .reduce((sum, e) => sum + Number(e.amount), 0)
+                              .reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? Number(e.amount) : -Number(e.amount)), 0)
                             return (
-                              <td key={f} style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700 }}>
-                                {formatMoney(totalDia)}
+                              <td key={f} style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: totalDia > 0 ? 'var(--success)' : totalDia < 0 ? 'var(--danger)' : 'inherit' }}>
+                                {(totalDia > 0 ? '+' : '') + formatMoney(totalDia)}
                               </td>
                             )
                           })}
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: 'var(--danger)' }}>
-                            {formatMoney(totalGastos)}
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800 }}>
+                            <div style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>Gastos: {formatMoney(totalGastos)}</div>
+                            <div style={{ color: 'var(--success)', fontSize: '0.8rem' }}>Ingresos: {formatMoney(ingresosExtra)}</div>
                           </td>
                         </tr>
                       </tfoot>
@@ -567,8 +573,8 @@ export default function FinanzasModule() {
         )}
       </div>
 
-      {/* Modal Nuevo Gasto */}
-      <Modal open={expenseModal.open} onClose={() => !saving && setExpenseModal({ open: false, edit: null })} title="Registrar Gasto">
+      {/* Modal Nuevo Gasto/Ingreso */}
+      <Modal open={expenseModal.open} onClose={() => !saving && setExpenseModal({ open: false, edit: null })} title={expenseForm.expense_type === 'ingreso' ? 'Registrar Ingreso' : 'Registrar Gasto'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {categories.length === 0 && (
             <div style={{ padding: '12px', background: 'var(--warning-soft)', color: 'var(--warning)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', gap: '8px' }}>
@@ -609,41 +615,43 @@ export default function FinanzasModule() {
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Tipo de gasto</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setExpenseForm({ ...expenseForm, expense_type: 'variable' })}
-                disabled={saving}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: '10px', border: '2px solid',
-                  borderColor: expenseForm.expense_type !== 'fixed' ? 'var(--warning)' : 'var(--border)',
-                  background: expenseForm.expense_type !== 'fixed' ? 'rgba(245,158,11,0.1)' : 'transparent',
-                  color: expenseForm.expense_type !== 'fixed' ? 'var(--warning)' : 'var(--text-muted)',
-                  cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s'
-                }}
-              >
-                🔄 Variable
-                <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: '2px', opacity: 0.8 }}>Mercadería, insumos</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setExpenseForm({ ...expenseForm, expense_type: 'fixed' })}
-                disabled={saving}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: '10px', border: '2px solid',
-                  borderColor: expenseForm.expense_type === 'fixed' ? 'var(--info)' : 'var(--border)',
-                  background: expenseForm.expense_type === 'fixed' ? 'rgba(59,130,246,0.1)' : 'transparent',
-                  color: expenseForm.expense_type === 'fixed' ? 'var(--info)' : 'var(--text-muted)',
-                  cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s'
-                }}
-              >
-                🔒 Fijo
-                <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: '2px', opacity: 0.8 }}>Alquiler, sueldo fijo</div>
-              </button>
+          {expenseForm.expense_type !== 'ingreso' && (
+            <div className="form-group">
+              <label className="form-label">Tipo de gasto</label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setExpenseForm({ ...expenseForm, expense_type: 'variable' })}
+                  disabled={saving}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '10px', border: '2px solid',
+                    borderColor: expenseForm.expense_type !== 'fixed' ? 'var(--warning)' : 'var(--border)',
+                    background: expenseForm.expense_type !== 'fixed' ? 'rgba(245,158,11,0.1)' : 'transparent',
+                    color: expenseForm.expense_type !== 'fixed' ? 'var(--warning)' : 'var(--text-muted)',
+                    cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s'
+                  }}
+                >
+                  🔄 Variable
+                  <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: '2px', opacity: 0.8 }}>Mercadería, insumos</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpenseForm({ ...expenseForm, expense_type: 'fixed' })}
+                  disabled={saving}
+                  style={{
+                    flex: 1, padding: '10px', borderRadius: '10px', border: '2px solid',
+                    borderColor: expenseForm.expense_type === 'fixed' ? 'var(--info)' : 'var(--border)',
+                    background: expenseForm.expense_type === 'fixed' ? 'rgba(59,130,246,0.1)' : 'transparent',
+                    color: expenseForm.expense_type === 'fixed' ? 'var(--info)' : 'var(--text-muted)',
+                    cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s'
+                  }}
+                >
+                  🔒 Fijo
+                  <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: '2px', opacity: 0.8 }}>Alquiler, sueldo fijo</div>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Descripción (Opcional)</label>
@@ -658,7 +666,7 @@ export default function FinanzasModule() {
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             <button onClick={handleSaveExpense} disabled={saving || categories.length === 0} className="btn btn-primary" style={{ flex: 1 }}>
-              {saving ? 'Guardando...' : `Guardar Gasto`}
+              {saving ? 'Guardando...' : expenseForm.expense_type === 'ingreso' ? 'Guardar Ingreso' : 'Guardar Gasto'}
             </button>
             <button onClick={() => setExpenseModal({ open: false, edit: null })} disabled={saving} className="btn btn-secondary">
               Cancelar
