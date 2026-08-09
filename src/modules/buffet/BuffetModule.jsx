@@ -585,7 +585,7 @@ export default function BuffetModule() {
                         borderRadius: '12px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease'
                       }}
                     >
-                      <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{g.name}</span>
+                      <span style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{g.name}</span>
                       <span style={{ background: 'var(--warning)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
                         x{g.count}
                       </span>
