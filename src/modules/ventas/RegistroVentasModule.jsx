@@ -86,7 +86,9 @@ export default function RegistroVentasModule() {
         const q = filterSearch.toLowerCase()
         const hasItem = (s.sale_items || []).some(i =>
           i.products?.name?.toLowerCase().includes(q) ||
-          i.products?.barcode?.includes(q)
+          i.products?.barcode?.includes(q) ||
+          i.buffet_products?.name?.toLowerCase().includes(q) ||
+          i.buffet_products?.barcode?.includes(q)
         )
         if (!hasItem && !s.id.toLowerCase().includes(q)) return false
       }
@@ -575,7 +577,7 @@ export default function RegistroVentasModule() {
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: item.toDelete ? 'var(--danger)' : 'var(--text-primary)' }}>
-                  {item.products?.name || '—'}
+                  {item.products?.name || item.buffet_products?.name || '—'}
                   {item.toDelete && <span style={{ marginLeft: '8px', fontSize: '0.75rem' }}>● A eliminar</span>}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
@@ -742,7 +744,7 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago
       </td>
       <td style={{ padding: '12px', fontSize: '0.85rem' }}>
         {(sale.sale_items || []).slice(0, 2).map((i, idx) => (
-          <div key={idx}>{i.quantity}x {i.products?.name}</div>
+          <div key={idx}>{i.quantity}x {i.products?.name || i.buffet_products?.name || 'Desconocido'}</div>
         ))}
         {(sale.sale_items || []).length > 2 && (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
