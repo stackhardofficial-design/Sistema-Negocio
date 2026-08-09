@@ -267,10 +267,16 @@ export default function FinanzasModule() {
           </h1>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={() => {
-              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toISOString().split('T')[0] })
+              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toISOString().split('T')[0], expense_type: 'ingreso' })
+              setExpenseModal({ open: true, edit: null })
+            }} className="btn btn-success">
+              <TrendingUp size={16} /> Registrar Ingreso
+            </button>
+            <button onClick={() => {
+              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toISOString().split('T')[0], expense_type: 'variable' })
               setExpenseModal({ open: true, edit: null })
             }} className="btn btn-primary">
-              <Plus size={16} /> Registrar Gasto
+              <TrendingDown size={16} /> Registrar Gasto
             </button>
           </div>
         </div>
