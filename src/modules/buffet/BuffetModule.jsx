@@ -634,7 +634,7 @@ export default function BuffetModule() {
           <div className="form-row">
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
               <label className="form-label">Nombre *</label>
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Hamburguesa completa" autoFocus />
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Hamburguesa completa" />
             </div>
             <div className="form-group">
               <label className="form-label">Código (Opcional)</label>
@@ -929,7 +929,7 @@ export default function BuffetModule() {
                   opacity: canScan ? 1 : 0.6
                 }}
               >
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: '1.3' }}>{bp.name}</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: '1.3', color: 'var(--text-primary)' }}>{bp.name}</span>
                 <span style={{ color: 'var(--accent)', fontWeight: 800, fontSize: '0.95rem' }}>{formatMoney(bp.price)}</span>
               </button>
             ))}
