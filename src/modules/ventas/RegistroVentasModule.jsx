@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetSales, dbCancelSale, dbLogActivity,
-  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo, dbResolveMultipagoSale
+  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo, dbResolveMultipagoSale, dbGetExpenses, dbGetBuffetProducts
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -49,6 +49,7 @@ export default function RegistroVentasModule() {
   const [editModal, setEditModal] = useState({ open: false, sale: null, items: [] })
   const [savingEdit, setSavingEdit] = useState(false)
   const [multipagoModal, setMultipagoModal] = useState({ open: false, sale: null, cash: '', transfer: '' })
+  const [buffetProducts, setBuffetProducts] = useState([])
 
   useEffect(() => {
     loadSales()
@@ -98,7 +99,7 @@ export default function RegistroVentasModule() {
 
   // ===== TOTALES (Dinámicos según filtros) =====
   const totals = useMemo(() => {
-    const completed = filteredSales.filter(s => s.status === 'completed')
+    const completed = filteredSales.filter(s => s.status === 'completed' && !s.is_income)
     const autoconsumo = filteredSales.filter(s => s.status === 'autoconsumo')
     return {
       sales: completed.reduce((a, s) => a + (s.total_amount || 0), 0),
@@ -436,7 +437,7 @@ export default function RegistroVentasModule() {
                 <tbody>
                   {(detailModal.sale.sale_items || []).map((item, i) => (
                     <tr key={i}>
-                      <td>{item.products?.name || item.buffet_products?.name || '—'}</td>
+                      <td>{item.custom_name || item.products?.name || (Array.isArray(item.buffet_products) ? item.buffet_products[0]?.name : item.buffet_products?.name) || (item.buffet_product_id ? buffetProducts.find(b => b.id === item.buffet_product_id)?.name : null) || '—'}</td>
                       <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{item.products?.barcode || item.buffet_products?.barcode || '—'}</td>
                       <td style={{ textAlign: 'right' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right' }}>{formatMoney(item.unit_price)}</td>
@@ -690,7 +691,7 @@ export default function RegistroVentasModule() {
 }
 
 // ===== COMPONENTE FILA DE VENTA =====
-function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago }) {
+function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago, buffetProducts = [] }) {
   const cancelled = sale.status === 'cancelled'
   const isAutoconsumo = sale.status === 'autoconsumo'
   
@@ -700,8 +701,8 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago
     
   const profit = isAutoconsumo ? -(sale.total_cost || 0) : (sale.total_amount || 0) - (sale.total_cost || 0)
 
-  let bgNormal = isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-card)'
-  let bgHover = isAutoconsumo ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)'
+  let bgNormal = isAutoconsumo ? 'rgba(139, 92, 246, 0.1)' : sale.is_income ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-card)'
+  let bgHover = isAutoconsumo ? 'rgba(139, 92, 246, 0.15)' : sale.is_income ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-secondary)'
   
   if (cancelled) {
     bgNormal = 'var(--danger-soft)'
@@ -743,9 +744,15 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago
         </div>
       </td>
       <td style={{ padding: '12px', fontSize: '0.85rem' }}>
-        {(sale.sale_items || []).slice(0, 2).map((i, idx) => (
-          <div key={idx}>{i.quantity}x {i.products?.name || i.buffet_products?.name || 'Desconocido'}</div>
-        ))}
+        {(sale.sale_items || []).slice(0, 2).map((i, idx) => {
+          let itemName = i.custom_name || i.products?.name || (Array.isArray(i.buffet_products) ? i.buffet_products[0]?.name : i.buffet_products?.name)
+          if (!itemName && i.buffet_product_id) {
+            const bp = buffetProducts.find(b => b.id === i.buffet_product_id)
+            if (bp) itemName = bp.name
+          }
+          if (!itemName) itemName = 'Desconocido'
+          return <div key={idx}>{i.quantity}x {itemName}</div>
+        })}
         {(sale.sale_items || []).length > 2 && (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '2px' }}>
             + {(sale.sale_items || []).length - 2} productos más...
@@ -756,15 +763,15 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago
         <PaymentBadge method={sale.payment_method} debtorName={sale.debtors?.name} />
       </td>
       <td style={{ padding: '12px', textAlign: 'center' }}>
-        <span className={`badge ${cancelled ? 'badge-danger' : isAutoconsumo ? 'badge-primary' : isPendingMultipago ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem', background: isAutoconsumo ? '#8b5cf6' : undefined, color: isAutoconsumo ? 'white' : undefined, border: isAutoconsumo ? 'none' : undefined }}>
-          {cancelled ? 'ANULADA' : isAutoconsumo ? 'AUTOCONSUMO' : isPendingMultipago ? 'PENDIENTE (EDITAR)' : 'COMPLETADA'}
+        <span className={`badge ${cancelled ? 'badge-danger' : sale.is_income ? 'badge-success' : isAutoconsumo ? 'badge-primary' : isPendingMultipago ? 'badge-warning' : 'badge-success'}`} style={{ fontSize: '0.7rem', background: isAutoconsumo ? '#8b5cf6' : sale.is_income ? 'rgba(16, 185, 129, 0.1)' : undefined, color: isAutoconsumo ? 'white' : sale.is_income ? 'var(--success)' : undefined, border: isAutoconsumo ? 'none' : sale.is_income ? '1px solid rgba(16, 185, 129, 0.3)' : undefined }}>
+          {cancelled ? 'ANULADA' : sale.is_income ? 'INGRESO CAJA' : isAutoconsumo ? 'AUTOCONSUMO' : isPendingMultipago ? 'PENDIENTE' : 'COMPLETADA'}
         </span>
       </td>
       <td style={{ padding: '12px', textAlign: 'right' }}>
-        <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: cancelled ? 'line-through' : 'none', color: isAutoconsumo ? 'var(--text-muted)' : 'inherit' }}>
-          {isAutoconsumo ? '$0 (Auto)' : formatMoney(sale.total_amount)}
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', textDecoration: cancelled ? 'line-through' : 'none', color: sale.is_income ? 'var(--success)' : isAutoconsumo ? 'var(--text-muted)' : 'inherit' }}>
+          {isAutoconsumo ? '$0 (Auto)' : sale.is_income ? `+ ${formatMoney(sale.total_amount)}` : formatMoney(sale.total_amount)}
         </div>
-        {!cancelled && isAdmin && (
+        {!cancelled && isAdmin && !sale.is_income && (
           <div style={{ fontSize: '0.7rem', color: isAutoconsumo ? 'var(--danger)' : 'var(--success)' }}>
             {isAutoconsumo ? '-' : '+'} {formatMoney(Math.abs(profit))}
           </div>
@@ -772,7 +779,7 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago
       </td>
       {isAdmin && (
         <td style={{ padding: '12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-          {!cancelled && !isAutoconsumo && !isPendingMultipago ? (
+          {!cancelled && !isAutoconsumo && !isPendingMultipago && !sale.is_income ? (
             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
               <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Editar / Autoconsumo" style={{ padding: '4px 8px' }}>
                 <Edit2 size={12} />
