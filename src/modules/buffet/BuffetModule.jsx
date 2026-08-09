@@ -129,7 +129,7 @@ export default function BuffetModule() {
   async function handleKitchenAction() {
     setProcessingAction(true)
     try {
-      const newStatus = kitchenAction.type === 'to_ready' ? 'ready' : 'delivered'
+      const newStatus = 'delivered'
       const amountToProcess = Math.min(kitchenAction.amount, kitchenAction.group.count)
       
       const sortedOrders = [...kitchenAction.group.orders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
@@ -146,7 +146,7 @@ export default function BuffetModule() {
 
       await Promise.all(ordersToUpdate.map(id => dbUpdateBuffetOrderStatus(id, newStatus)))
       
-      toast(`Se marcaron ${amountToProcess} ${kitchenAction.group.name} como ${newStatus === 'ready' ? 'Listos' : 'Entregados'}`, 'success')
+      toast(`Se entregaron ${amountToProcess} ${kitchenAction.group.name}`, 'success')
       setKitchenAction({ open: false, type: '', group: null, amount: 1 })
       load(false)
     } catch (e) {
@@ -434,24 +434,20 @@ export default function BuffetModule() {
   const activeMethod = PAYMENT_METHODS.find(m => m.id === paymentMethod)
 
   const pendingGrouped = {}
-  const readyGrouped = {}
 
   orders.forEach(o => {
     if (o.status === 'delivered') return
     const qty = o.buffet_order_items?.reduce((s, i) => s + i.quantity, 0) || 1
     const productName = o.buffet_order_items?.[0]?.buffet_products?.name || 'Desconocido'
     
-    const targetGroup = (o.status === 'pending' || o.status === 'preparing') ? pendingGrouped : readyGrouped
-    
-    if (!targetGroup[productName]) {
-      targetGroup[productName] = { count: 0, orders: [], name: productName }
+    if (!pendingGrouped[productName]) {
+      pendingGrouped[productName] = { count: 0, orders: [], name: productName }
     }
-    targetGroup[productName].count += qty
-    targetGroup[productName].orders.push(o)
+    pendingGrouped[productName].count += qty
+    pendingGrouped[productName].orders.push(o)
   })
 
   const pendingList = Object.values(pendingGrouped).sort((a,b) => b.count - a.count)
-  const readyList = Object.values(readyGrouped).sort((a,b) => b.count - a.count)
 
   return (
     <div className="fade-in">
@@ -570,46 +566,16 @@ export default function BuffetModule() {
           </div>
         ) : (
           /* ===== PEDIDOS AGRUPADOS ===== */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-            {/* Columna A Preparar */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', maxWidth: '600px', margin: '0 auto' }}>
             <div className="card" style={{ background: 'var(--bg-secondary)', border: 'none' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--warning)' }}>
-                <Clock size={18} /> A Preparar
+                <Clock size={18} /> En Cocina
               </h3>
               {pendingList.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nada pendiente</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {pendingList.map(g => (
-                    <button
-                      key={g.name}
-                      onClick={() => setKitchenAction({ open: true, type: 'to_ready', group: g, amount: g.count })}
-                      style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--border)',
-                        borderRadius: '12px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{g.name}</span>
-                      <span style={{ background: 'var(--warning)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
-                        x{g.count}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Columna Listos */}
-            <div className="card" style={{ background: 'var(--bg-secondary)', border: 'none' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--success)' }}>
-                <Utensils size={18} /> Listos para Entregar
-              </h3>
-              {readyList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay pedidos listos</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {readyList.map(g => (
                     <button
                       key={g.name}
                       onClick={() => setKitchenAction({ open: true, type: 'to_delivered', group: g, amount: g.count })}
@@ -620,7 +586,7 @@ export default function BuffetModule() {
                       }}
                     >
                       <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{g.name}</span>
-                      <span style={{ background: 'var(--success)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
+                      <span style={{ background: 'var(--warning)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
                         x{g.count}
                       </span>
                     </button>
@@ -976,7 +942,7 @@ export default function BuffetModule() {
       <Modal
         open={kitchenAction.open}
         onClose={() => !processingAction && setKitchenAction({ open: false, type: '', group: null, amount: 1 })}
-        title={kitchenAction.type === 'to_ready' ? '¿Cuántos están listos?' : '¿Cuántos se entregan?'}
+        title="¿Cuántas se entregan?"
         size="sm"
       >
         {kitchenAction.group && (
@@ -1009,7 +975,7 @@ export default function BuffetModule() {
               >Cancelar</button>
               <button 
                 onClick={handleKitchenAction} 
-                className={kitchenAction.type === 'to_ready' ? 'btn btn-success' : 'btn btn-primary'}
+                className="btn btn-primary"
                 disabled={processingAction}
               >
                 {processingAction ? 'Guardando...' : 'Confirmar'}
