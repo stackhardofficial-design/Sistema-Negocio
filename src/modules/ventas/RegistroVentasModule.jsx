@@ -51,6 +51,34 @@ export default function RegistroVentasModule() {
   const [multipagoModal, setMultipagoModal] = useState({ open: false, sale: null, cash: '', transfer: '' })
   const [buffetProducts, setBuffetProducts] = useState([])
 
+  const loadSales = useCallback(async (showLoading = true) => {
+    if (!tenantId) { setLoadingSales(false); return }
+    if (showLoading) setLoadingSales(true)
+    try {
+      const data = await dbGetSales(tenantId, { limit: 500 })
+      
+      const exps = await dbGetExpenses(tenantId, { dateFrom: filterDateFrom, dateTo: filterDateTo })
+      const incomes = exps.filter(e => e.expense_type === 'ingreso').map(e => ({
+        id: e.id,
+        created_at: e.expense_date ? `${e.expense_date}T12:00:00.000Z` : e.created_at,
+        total_amount: e.amount,
+        total_cost: 0,
+        payment_method: 'efectivo',
+        status: 'completed',
+        is_income: true,
+        users: { name: e.users?.name || 'Caja' },
+        sale_items: [{ quantity: 1, custom_name: e.description || e.expense_categories?.name || 'Ingreso manual' }]
+      }))
+      
+      const merged = [...data, ...incomes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setSales(merged)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      if (showLoading) setLoadingSales(false)
+    }
+  }, [tenantId, filterDateFrom, filterDateTo])
+
   useEffect(() => {
     loadSales()
     if (!tenantId) return
@@ -58,17 +86,7 @@ export default function RegistroVentasModule() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => loadSales(false))
       .subscribe()
     return () => { sb.removeChannel(channel) }
-  }, [tenantId])
-
-  async function loadSales(showLoading = true) {
-    if (!tenantId) { setLoadingSales(false); return }
-    if (showLoading) setLoadingSales(true)
-    const data = await dbGetSales(tenantId, { limit: 500 })
-    setSales(data)
-    if (showLoading) setLoadingSales(false)
-
-    // Los totales ahora se calculan dinámicamente en base a filteredSales
-  }
+  }, [tenantId, loadSales])
 
   // ===== FILTRADO =====
   const filteredSales = useMemo(() => {
