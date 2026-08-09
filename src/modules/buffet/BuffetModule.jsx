@@ -123,6 +123,39 @@ export default function BuffetModule() {
   const quantityRef = useRef(1)
   const [selling, setSelling] = useState(false)
 
+  const [kitchenAction, setKitchenAction] = useState({ open: false, type: '', group: null, amount: 1 })
+  const [processingAction, setProcessingAction] = useState(false)
+
+  async function handleKitchenAction() {
+    setProcessingAction(true)
+    try {
+      const newStatus = kitchenAction.type === 'to_ready' ? 'ready' : 'delivered'
+      const amountToProcess = Math.min(kitchenAction.amount, kitchenAction.group.count)
+      
+      const sortedOrders = [...kitchenAction.group.orders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      
+      let unitsLeft = amountToProcess
+      const ordersToUpdate = []
+      
+      for (const o of sortedOrders) {
+        if (unitsLeft <= 0) break
+        const orderQty = o.buffet_order_items?.reduce((s, i) => s + i.quantity, 0) || 1
+        ordersToUpdate.push(o.id)
+        unitsLeft -= orderQty
+      }
+
+      await Promise.all(ordersToUpdate.map(id => dbUpdateBuffetOrderStatus(id, newStatus)))
+      
+      toast(`Se marcaron ${amountToProcess} ${kitchenAction.group.name} como ${newStatus === 'ready' ? 'Listos' : 'Entregados'}`, 'success')
+      setKitchenAction({ open: false, type: '', group: null, amount: 1 })
+      load(false)
+    } catch (e) {
+      toast('Error al actualizar pedidos', 'error')
+    } finally {
+      setProcessingAction(false)
+    }
+  }
+
   async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
     if (showLoading) setLoading(true)
@@ -400,6 +433,26 @@ export default function BuffetModule() {
 
   const activeMethod = PAYMENT_METHODS.find(m => m.id === paymentMethod)
 
+  const pendingGrouped = {}
+  const readyGrouped = {}
+
+  orders.forEach(o => {
+    if (o.status === 'delivered') return
+    const qty = o.buffet_order_items?.reduce((s, i) => s + i.quantity, 0) || 1
+    const productName = o.buffet_order_items?.[0]?.buffet_products?.name || 'Desconocido'
+    
+    const targetGroup = (o.status === 'pending' || o.status === 'preparing') ? pendingGrouped : readyGrouped
+    
+    if (!targetGroup[productName]) {
+      targetGroup[productName] = { count: 0, orders: [], name: productName }
+    }
+    targetGroup[productName].count += qty
+    targetGroup[productName].orders.push(o)
+  })
+
+  const pendingList = Object.values(pendingGrouped).sort((a,b) => b.count - a.count)
+  const readyList = Object.values(readyGrouped).sort((a,b) => b.count - a.count)
+
   return (
     <div className="fade-in">
       <div className="module-header">
@@ -516,56 +569,65 @@ export default function BuffetModule() {
             </table>
           </div>
         ) : (
-          /* ===== PEDIDOS ===== */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {orders.length === 0 ? (
-              <div className="empty-state">
-                <Clock size={40} />
-                <h3>Sin pedidos activos</h3>
-              </div>
-            ) : orders.map(order => {
-              const st = STATUS_LABELS[order.status] || STATUS_LABELS.pending
-              return (
-                <div key={order.id} className="card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {order.customer_name ? <span style={{display:'flex', alignItems:'center', gap:'4px'}}><User size={14}/> {order.customer_name}</span> : 'Pedido de Buffet'}
-                        <span className={`badge ${st.badge}`}>{st.label}</span>
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {formatTime(order.created_at)} · {order.users?.name}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--accent)', marginRight: '6px' }}>{formatMoney(order.total_amount)}</span>
-                      {order.status === 'pending' && (
-                        <button onClick={() => changeOrderStatus(order.id, 'preparing')} className="btn btn-secondary btn-sm">
-                          Preparar
-                        </button>
-                      )}
-                      {order.status === 'preparing' && (
-                        <button onClick={() => changeOrderStatus(order.id, 'ready')} className="btn btn-success btn-sm">
-                          Listo
-                        </button>
-                      )}
-                      {order.status === 'ready' && (
-                        <button onClick={() => changeOrderStatus(order.id, 'delivered')} className="btn btn-primary btn-sm">
-                          Entregar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {(order.buffet_order_items || []).map((item, i) => (
-                      <span key={i} className="badge badge-neutral">
-                        {item.quantity}x {item.buffet_products?.name}
+          /* ===== PEDIDOS AGRUPADOS ===== */
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {/* Columna A Preparar */}
+            <div className="card" style={{ background: 'var(--bg-secondary)', border: 'none' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--warning)' }}>
+                <Clock size={18} /> A Preparar
+              </h3>
+              {pendingList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nada pendiente</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {pendingList.map(g => (
+                    <button
+                      key={g.name}
+                      onClick={() => setKitchenAction({ open: true, type: 'to_ready', group: g, amount: g.count })}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--border)',
+                        borderRadius: '12px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{g.name}</span>
+                      <span style={{ background: 'var(--warning)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
+                        x{g.count}
                       </span>
-                    ))}
-                  </div>
+                    </button>
+                  ))}
                 </div>
-              )
-            })}
+              )}
+            </div>
+
+            {/* Columna Listos */}
+            <div className="card" style={{ background: 'var(--bg-secondary)', border: 'none' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--success)' }}>
+                <Utensils size={18} /> Listos para Entregar
+              </h3>
+              {readyList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay pedidos listos</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {readyList.map(g => (
+                    <button
+                      key={g.name}
+                      onClick={() => setKitchenAction({ open: true, type: 'to_delivered', group: g, amount: g.count })}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--border)',
+                        borderRadius: '12px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{g.name}</span>
+                      <span style={{ background: 'var(--success)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
+                        x{g.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -909,6 +971,54 @@ export default function BuffetModule() {
 
         </div>
       </Modal>
+
+      {/* ===== MODAL KITCHEN ACTION ===== */}
+      <Modal
+        open={kitchenAction.open}
+        onClose={() => !processingAction && setKitchenAction({ open: false, type: '', group: null, amount: 1 })}
+        title={kitchenAction.type === 'to_ready' ? '¿Cuántos están listos?' : '¿Cuántos se entregan?'}
+        size="sm"
+      >
+        {kitchenAction.group && (
+          <div style={{ textAlign: 'center' }}>
+            <h3 style={{ marginBottom: '20px', color: 'var(--accent)' }}>{kitchenAction.group.name}</h3>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', marginBottom: '30px' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: '45px', height: '45px', borderRadius: '50%', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setKitchenAction(prev => ({ ...prev, amount: Math.max(1, prev.amount - 1) }))}
+              ><Minus size={20} /></button>
+              
+              <div style={{ fontSize: '2.5rem', fontWeight: 800, minWidth: '60px' }}>
+                {kitchenAction.amount}
+              </div>
+              
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: '45px', height: '45px', borderRadius: '50%', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setKitchenAction(prev => ({ ...prev, amount: Math.min(prev.group.count, prev.amount + 1) }))}
+              ><Plus size={20} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button 
+                onClick={() => !processingAction && setKitchenAction({ open: false, type: '', group: null, amount: 1 })} 
+                className="btn btn-secondary"
+                disabled={processingAction}
+              >Cancelar</button>
+              <button 
+                onClick={handleKitchenAction} 
+                className={kitchenAction.type === 'to_ready' ? 'btn btn-success' : 'btn btn-primary'}
+                disabled={processingAction}
+              >
+                {processingAction ? 'Guardando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
     </div>
   )
 }

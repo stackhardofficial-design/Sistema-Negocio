@@ -557,24 +557,47 @@ export async function dbGetBuffetOrders(tenantId, status = null) {
 }
 
 export async function dbCreateBuffetOrder(tenantId, userId, items, customerName = null) {
-  const { data: order, error } = await sb.from('buffet_orders').insert({
+  const individualItems = []
+  items.forEach(i => {
+    for (let j = 0; j < i.quantity; j++) {
+      individualItems.push({
+        ...i,
+        quantity: 1,
+        subtotal: i.unit_price
+      })
+    }
+  })
+
+  const ordersToInsert = individualItems.map(i => ({
     tenant_id: tenantId,
     user_id: userId,
     customer_name: customerName,
     status: 'pending',
-    total_amount: items.reduce((s, i) => s + i.subtotal, 0)
-  }).select().single()
-  if (error) throw error
-
-  const rows = items.map(i => ({
-    order_id: order.id,
-    buffet_product_id: i.buffet_product_id,
-    quantity: i.quantity,
-    unit_price: i.unit_price,
-    subtotal: i.subtotal
+    total_amount: i.subtotal
   }))
-  await sb.from('buffet_order_items').insert(rows)
-  return order
+
+  if (ordersToInsert.length === 0) return []
+
+  const { data: createdOrders, error: errOrders } = await sb.from('buffet_orders')
+    .insert(ordersToInsert)
+    .select()
+  if (errOrders) throw errOrders
+
+  const orderItemsToInsert = createdOrders.map((order, idx) => {
+    const i = individualItems[idx]
+    return {
+      order_id: order.id,
+      buffet_product_id: i.buffet_product_id,
+      quantity: 1,
+      unit_price: i.unit_price,
+      subtotal: i.subtotal
+    }
+  })
+
+  const { error: errItems } = await sb.from('buffet_order_items').insert(orderItemsToInsert)
+  if (errItems) throw errItems
+
+  return createdOrders
 }
 
 export async function dbUpdateBuffetOrderStatus(orderId, status) {
