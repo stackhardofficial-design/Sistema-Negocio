@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import { sb, dbGetUsers, dbUpdateUser, dbDeleteUser, dbLogActivity, dbCreateUserForTenant, dbGetAllUsersWithTenants } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Users, Plus, Edit2, UserX, UserCheck, Search, Shield, Eye, EyeOff } from 'lucide-react'
+import { 
+  Users, Plus, Edit2, UserX, UserCheck, Search, Shield, Eye, EyeOff,
+  LayoutDashboard, ShoppingCart, ListChecks, DollarSign, PackageOpen, Box, Coffee, UsersRound, History, Settings
+} from 'lucide-react'
 
 const ROLES = [
   { value: 'vendedor', label: 'Vendedor', desc: 'Puede registrar ventas y ver productos' },
@@ -10,17 +13,17 @@ const ROLES = [
 ]
 
 const AVAILABLE_MODULES = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'ventas', label: 'Ventas' },
-  { id: 'registro_ventas', label: 'Registro de Ventas' },
-  { id: 'finanzas', label: 'Finanzas (Caja)' },
-  { id: 'productos', label: 'Productos' },
-  { id: 'stock', label: 'Stock' },
-  { id: 'buffet', label: 'Buffet' },
-  { id: 'deudores', label: 'Deudores' },
-  { id: 'empleados', label: 'Empleados' },
-  { id: 'historial', label: 'Historial' },
-  { id: 'configuracion', label: 'Configuración' }
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'ventas', label: 'Ventas', icon: ShoppingCart },
+  { id: 'registro_ventas', label: 'Registro Ventas', icon: ListChecks },
+  { id: 'finanzas', label: 'Finanzas', icon: DollarSign },
+  { id: 'productos', label: 'Productos', icon: PackageOpen },
+  { id: 'stock', label: 'Stock', icon: Box },
+  { id: 'buffet', label: 'Buffet', icon: Coffee },
+  { id: 'deudores', label: 'Deudores', icon: Users },
+  { id: 'empleados', label: 'Empleados', icon: UsersRound },
+  { id: 'historial', label: 'Historial', icon: History },
+  { id: 'configuracion', label: 'Configuración', icon: Settings }
 ]
 
 const EMPTY_NEW_USER = { name: '', email_prefix: '', password: '', role: 'vendedor', access_modules: ['dashboard', 'ventas', 'registro_ventas', 'productos', 'stock', 'buffet', 'deudores'] }
@@ -334,18 +337,34 @@ export default function EmpleadosModule() {
 
         <div className="form-group">
           <label className="form-label">Accesos a Módulos (Apartados)</label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
-            {AVAILABLE_MODULES.map(m => (
-              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={editForm.access_modules.includes(m.id)}
-                  onChange={() => toggleModule(setEditForm, m.id)}
-                />
-                {m.label}
-              </label>
-            ))}
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
+              {AVAILABLE_MODULES.map(m => {
+                const isActive = editForm.access_modules.includes(m.id)
+                const Icon = m.icon
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleModule(setEditForm, m.id)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      padding: '12px 6px', borderRadius: '12px',
+                      background: isActive ? 'rgba(245,158,11,0.12)' : 'var(--bg-tertiary)',
+                      border: `2px solid ${isActive ? 'rgba(245,158,11,0.5)' : 'var(--border)'}`,
+                      color: isActive ? '#f59e0b' : 'var(--text-secondary)',
+                      cursor: 'pointer', transition: 'all 0.15s ease',
+                      position: 'relative', overflow: 'hidden'
+                    }}
+                  >
+                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, textAlign: 'center', lineHeight: 1.1 }}>{m.label}</span>
+                    {isActive && (
+                      <div style={{ position: 'absolute', top: 6, right: 6, width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }} />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
         </div>
       </Modal>
 
@@ -433,17 +452,33 @@ export default function EmpleadosModule() {
 
           <div className="form-group">
             <label className="form-label">Accesos a Módulos (Apartados)</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px' }}>
-              {AVAILABLE_MODULES.map(m => (
-                <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={newForm.access_modules.includes(m.id)}
-                    onChange={() => toggleModule(setNewForm, m.id)}
-                  />
-                  {m.label}
-                </label>
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
+              {AVAILABLE_MODULES.map(m => {
+                const isActive = newForm.access_modules.includes(m.id)
+                const Icon = m.icon
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleModule(setNewForm, m.id)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      padding: '12px 6px', borderRadius: '12px',
+                      background: isActive ? 'rgba(245,158,11,0.12)' : 'var(--bg-tertiary)',
+                      border: `2px solid ${isActive ? 'rgba(245,158,11,0.5)' : 'var(--border)'}`,
+                      color: isActive ? '#f59e0b' : 'var(--text-secondary)',
+                      cursor: 'pointer', transition: 'all 0.15s ease',
+                      position: 'relative', overflow: 'hidden'
+                    }}
+                  >
+                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, textAlign: 'center', lineHeight: 1.1 }}>{m.label}</span>
+                    {isActive && (
+                      <div style={{ position: 'absolute', top: 6, right: 6, width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }} />
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
