@@ -572,6 +572,7 @@ export async function dbCreateBuffetOrder(tenantId, userId, items, customerName 
     tenant_id: tenantId,
     user_id: userId,
     customer_name: customerName,
+    notes: notes,
     status: 'pending',
     total_amount: i.subtotal
   }))
