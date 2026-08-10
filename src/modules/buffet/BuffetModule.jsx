@@ -604,22 +604,49 @@ export default function BuffetModule() {
               {pendingList.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Nada pendiente</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {pendingList.map(g => (
-                    <button
-                      key={g.name}
-                      onClick={() => setKitchenAction({ open: true, type: 'to_delivered', group: g, amount: g.count })}
-                      style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '16px', background: 'var(--bg-primary)', border: '1px solid var(--border)',
-                        borderRadius: '12px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{g.name}</span>
-                      <span style={{ background: 'var(--warning)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
-                        x{g.count}
-                      </span>
-                    </button>
+                    <div key={g.name} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                      {/* Group Header (Acumulado) */}
+                      <div
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)'
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{g.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ background: 'var(--warning)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '1.2rem' }}>
+                            x{g.count}
+                          </span>
+                          <button onClick={() => setKitchenAction({ open: true, type: 'to_delivered', group: g, amount: g.count })} className="btn btn-sm btn-secondary">
+                            Lote
+                          </button>
+                        </div>
+                      </div>
+                      {/* Individual Orders */}
+                      <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column' }}>
+                        {g.orders.map((o, idx) => {
+                          const qty = o.buffet_order_items?.reduce((s, i) => s + i.quantity, 0) || 1
+                          const cName = o.customer_name || 'Sin nombre'
+                          return (
+                            <div key={o.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: idx !== g.orders.length - 1 ? '1px solid var(--border-light)' : 'none' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>{qty}x {cName}</span>
+                                {o.notes && <span style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: 500 }}>{o.notes}</span>}
+                              </div>
+                              <button 
+                                onClick={() => changeOrderStatus(o.id, 'delivered')} 
+                                className="btn btn-sm" 
+                                style={{ background: 'var(--success-soft)', color: 'var(--success)', border: 'none' }}
+                              >
+                                ✔ Listo
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
