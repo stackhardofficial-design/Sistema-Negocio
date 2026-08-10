@@ -105,6 +105,7 @@ export default function ProductosModule() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
+    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [modal, setModal] = useState({ open: false, edit: null })
   const [form, setForm] = useState(EMPTY_PRODUCT)
   const [saving, setSaving] = useState(false)
@@ -392,6 +393,50 @@ export default function ProductosModule() {
     return p.stock
   }
 
+  const handleSort = (key) => {
+    let direction = 'asc'
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
+    setSortConfig({ key, direction })
+  }
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) return <span style={{ opacity: 0.3, marginLeft: 4 }}>↕</span>
+    return sortConfig.direction === 'asc' ? <ChevronUp size={12} style={{ marginLeft: 4 }} /> : <ChevronDown size={12} style={{ marginLeft: 4 }} />
+  }
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    if (!sortConfig.key) return 0
+    let valA = a[sortConfig.key]
+    let valB = b[sortConfig.key]
+
+    if (sortConfig.key === 'cost') {
+      valA = getDisplayCost(a)
+      valB = getDisplayCost(b)
+    } else if (sortConfig.key === 'margin') {
+      valA = Number(margin(a)) || 0
+      valB = Number(margin(b)) || 0
+    } else if (sortConfig.key === 'markup') {
+      valA = Number(markup(a)) || 0
+      valB = Number(markup(b)) || 0
+    } else if (sortConfig.key === 'stock') {
+      valA = getDisplayStock(a) || 0
+      valB = getDisplayStock(b) || 0
+    } else if (sortConfig.key === 'price') {
+      valA = Number(a.price) || 0
+      valB = Number(b.price) || 0
+    } else if (sortConfig.key === 'category') {
+      valA = (categories.find(c => c.id === a.category_id)?.name || '').toLowerCase()
+      valB = (categories.find(c => c.id === b.category_id)?.name || '').toLowerCase()
+    } else {
+      if (typeof valA === 'string') valA = valA.toLowerCase()
+      if (typeof valB === 'string') valB = valB.toLowerCase()
+    }
+
+    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
+    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
+    return 0
+  })
+
   const totalInvertido = products.reduce((acc, p) => {
     if (p.is_composite) return acc // Evitar contar doble
     const cost = parseFloat(p.cost_price || 0)
@@ -487,19 +532,19 @@ export default function ProductosModule() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Código</th>
-                  <th>Categoría</th>
-                  <th style={{ textAlign: 'right' }}>Precio</th>
-                  <th style={{ textAlign: 'right' }}>Costo</th>
-                  <th style={{ textAlign: 'right' }} title="Ganancia sobre costo">Ganancia</th>
-                  <th style={{ textAlign: 'right' }} title="Margen sobre venta">Margen</th>
-                  <th style={{ textAlign: 'right' }}>Stock</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
+                  <tr>
+                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('name')}>Nombre <SortIcon columnKey="name" /></th>
+                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('barcode')}>Código <SortIcon columnKey="barcode" /></th>
+                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('category')}>Categoría <SortIcon columnKey="category" /></th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('price')}>Precio <SortIcon columnKey="price" /></th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('cost')}>Costo <SortIcon columnKey="cost" /></th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} title="Ganancia sobre costo" onClick={() => handleSort('markup')}>Ganancia <SortIcon columnKey="markup" /></th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} title="Margen sobre venta" onClick={() => handleSort('margin')}>Margen <SortIcon columnKey="margin" /></th>
+                    <th style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('stock')}>Stock <SortIcon columnKey="stock" /></th>
+                    <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('is_active')}>Estado <SortIcon columnKey="is_active" /></th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
@@ -510,7 +555,7 @@ export default function ProductosModule() {
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map(p => {
+                ) : sortedFiltered.map(p => {
                   const mg = margin(p)
                   const mk = markup(p)
                   const dispStock = getDisplayStock(p)
