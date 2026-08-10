@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { Menu } from 'lucide-react'
+import { Menu, ShieldAlert } from 'lucide-react'
 import { AppProvider, useApp } from './lib/AppContext.jsx'
 import { dbGetSession, dbGetUserInfo, dbGetTenant } from './lib/supabase.js'
 import Login from './components/Login.jsx'
@@ -23,6 +23,59 @@ import FinanzasModule from './modules/finanzas/FinanzasModule.jsx'
 import IAModule from './modules/ia/IAModule.jsx'
 import './index.css'
 
+// Map of route id -> { component, roles (from Sidebar MENU_ITEMS logic) }
+const ROUTE_MAP = [
+  { id: 'dashboard', component: DashboardModule, roles: [] },
+  { id: 'ventas', component: VentasModule, roles: [] },
+  { id: 'registro_ventas', component: RegistroVentasModule, roles: [] },
+  { id: 'productos', component: ProductosModule, roles: [] },
+  { id: 'stock', component: StockModule, roles: [] },
+  { id: 'buffet', component: BuffetModule, roles: [] },
+  { id: 'finanzas', component: FinanzasModule, roles: ['admin'] },
+  { id: 'deudores', component: DeudoresModule, roles: [] },
+  { id: 'empleados', component: EmpleadosModule, roles: ['admin', 'super_admin'] },
+  { id: 'historial', component: HistorialModule, roles: ['admin', 'super_admin'] },
+  { id: 'superadmin', component: SuperAdminModule, roles: ['super_admin'] },
+  { id: 'configuracion', component: ConfiguracionModule, roles: ['admin', 'super_admin'] },
+  { id: 'ia', component: IAModule, roles: [] },
+]
+
+function AccessDenied() {
+  return (
+    <div style={{ 
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '60vh', gap: '16px', color: 'var(--text-muted)'
+    }}>
+      <ShieldAlert size={48} color="var(--danger)" />
+      <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>Acceso Denegado</h2>
+      <p style={{ margin: 0, fontSize: '0.9rem' }}>No tenés permiso para ver este apartado.</p>
+    </div>
+  )
+}
+
+function ProtectedRoute({ routeItem, children }) {
+  const { hasModuleAccess, hasRole } = useApp()
+
+  const hasAccess = hasModuleAccess(routeItem)
+  if (!hasAccess) return <AccessDenied />
+  return children
+}
+
+function SmartRedirect() {
+  const { userInfo, hasModuleAccess, hasRole } = useApp()
+
+  if (!userInfo) return <Navigate to="/ventas" replace />
+
+  // Super admin siempre va a /superadmin
+  if (hasRole('super_admin')) return <Navigate to="/superadmin" replace />
+
+  // Buscar el primer módulo al que tiene acceso
+  const firstAllowed = ROUTE_MAP.find(r => hasModuleAccess(r))
+  if (firstAllowed) return <Navigate to={`/${firstAllowed.id}`} replace />
+
+  // Fallback extremo
+  return <Navigate to="/ventas" replace />
+}
 
 function AppShell() {
   const {
@@ -105,21 +158,19 @@ function AppShell() {
       {/* Main Content */}
       <main className="workspace">
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardModule />} />
-          <Route path="/ventas" element={<VentasModule />} />
-          <Route path="/registro_ventas" element={<RegistroVentasModule />} />
-          <Route path="/productos" element={<ProductosModule />} />
-          <Route path="/stock" element={<StockModule />} />
-          <Route path="/buffet" element={<BuffetModule />} />
-          <Route path="/finanzas" element={<FinanzasModule />} />
-          <Route path="/deudores" element={<DeudoresModule />} />
-          <Route path="/empleados" element={<EmpleadosModule />} />
-          <Route path="/historial" element={<HistorialModule />} />
-          <Route path="/superadmin" element={<SuperAdminModule />} />
-          <Route path="/configuracion" element={<ConfiguracionModule />} />
-          <Route path="/ia" element={<IAModule />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<SmartRedirect />} />
+          {ROUTE_MAP.map(r => (
+            <Route 
+              key={r.id} 
+              path={`/${r.id}`} 
+              element={
+                <ProtectedRoute routeItem={r}>
+                  <r.component />
+                </ProtectedRoute>
+              } 
+            />
+          ))}
+          <Route path="*" element={<SmartRedirect />} />
         </Routes>
       </main>
 
