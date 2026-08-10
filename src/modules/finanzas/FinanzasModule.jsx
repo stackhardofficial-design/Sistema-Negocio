@@ -35,14 +35,14 @@ export default function FinanzasModule() {
     d.setDate(d.getDate() - 7) // Últimos 7 días por defecto
     return d.toISOString().split('T')[0]
   })
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [dateTo, setDateTo] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }))
   const [gastosSearch, setGastosSearch] = useState('')
   const [gastosTypeFilter, setGastosTypeFilter] = useState('all')
   const [gastosCategoryFilter, setGastosCategoryFilter] = useState('all')
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
-  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toISOString().split('T')[0], expense_type: 'variable' })
+  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'variable' })
   
   const [catModal, setCatModal] = useState({ open: false, edit: null })
   const [catForm, setCatForm] = useState({ name: '' })
@@ -267,13 +267,13 @@ export default function FinanzasModule() {
           </h1>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={() => {
-              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toISOString().split('T')[0], expense_type: 'ingreso' })
+              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'ingreso' })
               setExpenseModal({ open: true, edit: null })
             }} className="btn btn-success">
               <TrendingUp size={16} /> Registrar Ingreso
             </button>
             <button onClick={() => {
-              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toISOString().split('T')[0], expense_type: 'variable' })
+              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'variable' })
               setExpenseModal({ open: true, edit: null })
             }} className="btn btn-primary">
               <TrendingDown size={16} /> Registrar Gasto

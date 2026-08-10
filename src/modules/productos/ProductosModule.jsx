@@ -139,7 +139,7 @@ export default function ProductosModule() {
             barcode: product.barcode || '',
             unit_cost: product.cost_price || 0
           }),
-          expense_date: new Date().toISOString().split('T')[0],
+          expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
           expense_type: 'variable'
         })
         toast(`Gasto de ${formatMoney(cost)} registrado en Caja `, 'success')
