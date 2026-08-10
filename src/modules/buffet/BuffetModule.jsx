@@ -427,7 +427,16 @@ export default function BuffetModule() {
   }
 
   const getDisplayStock = (p) => {
-    if (p.is_composite) return null // Combos don't have stock themselves, it's calculated on demand
+    if (p.is_composite) {
+      if (!p.buffet_product_components || p.buffet_product_components.length === 0) return 0
+      let minStock = Infinity
+      for (const c of p.buffet_product_components) {
+        const itemStock = c.products?.stock ?? c.buffet_products?.stock ?? 0
+        const possible = Math.floor(itemStock / (c.quantity || 1))
+        if (possible < minStock) minStock = possible
+      }
+      return minStock === Infinity ? 0 : minStock
+    }
     return p.stock
   }
 
