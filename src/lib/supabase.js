@@ -556,7 +556,7 @@ export async function dbGetBuffetOrders(tenantId, status = null) {
   return data || []
 }
 
-export async function dbCreateBuffetOrder(tenantId, userId, items, customerName = null) {
+export async function dbCreateBuffetOrder(tenantId, userId, items, customerName = null, notes = null) {
   const individualItems = []
   items.forEach(i => {
     for (let j = 0; j < i.quantity; j++) {

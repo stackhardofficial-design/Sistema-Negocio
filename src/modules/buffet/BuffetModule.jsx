@@ -122,6 +122,8 @@ export default function BuffetModule() {
   const [quantity, setQuantity] = useState(1)
   const quantityRef = useRef(1)
   const [selling, setSelling] = useState(false)
+  const [orderCustomerName, setOrderCustomerName] = useState('')
+  const [orderNotes, setOrderNotes] = useState('')
 
   const [kitchenAction, setKitchenAction] = useState({ open: false, type: '', group: null, amount: 1 })
   const [processingAction, setProcessingAction] = useState(false)
@@ -365,9 +367,11 @@ export default function BuffetModule() {
       }
 
       // 3. Create Buffet Order (Kitchen)
+      const finalCustomerName = orderCustomerName.trim() || (paymentMethod === 'deudor' ? selectedDebtor.name : null)
+      const finalNotes = orderNotes.trim() || null
       const order = await dbCreateBuffetOrder(tenantId, userInfo?.id, [{
         buffet_product_id: bp.id, quantity: qty, unit_price: bp.price, subtotal: total
-      }], paymentMethod === 'deudor' ? selectedDebtor.name : null)
+      }], finalCustomerName, finalNotes)
 
       // 4. Descontar Stock
       if (!bp.is_composite && bp.stock !== null) {
@@ -396,13 +400,15 @@ export default function BuffetModule() {
       setPaymentMethod(null)
       setSelectedDebtor(null)
       setOrderModal({ open: false })
+      setOrderCustomerName('')
+      setOrderNotes('')
       load(false)
     } catch (err) {
       toast(`Error al registrar: ${err.message}`, 'danger')
     } finally {
       setSelling(false)
     }
-  }, [tenantId, userInfo, selling, canScan, paymentMethod, selectedDebtor])
+  }, [tenantId, userInfo, selling, canScan, paymentMethod, selectedDebtor, orderCustomerName, orderNotes])
 
   async function changeOrderStatus(orderId, status) {
     try {
@@ -742,7 +748,7 @@ export default function BuffetModule() {
       {/* ===== MODAL Nuevo Pedido (Venta Express Buffet) ===== */}
       <Modal
         open={orderModal.open}
-        onClose={() => { setOrderModal({ open: false }); setPaymentMethod(null); setQuantity(1) }}
+        onClose={() => { setOrderModal({ open: false }); setPaymentMethod(null); setQuantity(1); setOrderCustomerName(''); setOrderNotes(''); }}
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Zap size={20} color="var(--accent)" />
@@ -753,7 +759,30 @@ export default function BuffetModule() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* SELECTOR DE PAGO */}
+          
+            {/* NOMBRE Y NOTAS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Nombre del Cliente (Opcional)</label>
+                <input 
+                  type="text" 
+                  value={orderCustomerName} 
+                  onChange={e => setOrderCustomerName(e.target.value)} 
+                  placeholder="Ej: Juan Perez"
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Notas (Opcional)</label>
+                <input 
+                  type="text" 
+                  value={orderNotes} 
+                  onChange={e => setOrderNotes(e.target.value)} 
+                  placeholder="Ej: Sin aderezo"
+                />
+              </div>
+            </div>
+
+            {/* SELECTOR DE PAGO */}
           <div style={{
             background: 'var(--bg-secondary)',
             border: `2px solid ${activeMethod ? activeMethod.colorBorder : 'var(--border)'}`,
