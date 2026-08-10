@@ -60,7 +60,7 @@ export default function RegistroVentasModule() {
       const exps = await dbGetExpenses(tenantId, { dateFrom: filterDateFrom, dateTo: filterDateTo })
       const incomes = exps.filter(e => e.expense_type === 'ingreso').map(e => ({
         id: e.id,
-        created_at: e.expense_date ? `${e.expense_date}T12:00:00.000Z` : e.created_at,
+        created_at: e.created_at,
         total_amount: e.amount,
         total_cost: 0,
         payment_method: 'efectivo',
@@ -82,10 +82,18 @@ export default function RegistroVentasModule() {
   useEffect(() => {
     loadSales()
     if (!tenantId) return
-    const channel = sb.channel('registro_ventas_changes')
+    const channelSales = sb.channel('registro_ventas_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => loadSales(false))
       .subscribe()
-    return () => { sb.removeChannel(channel) }
+      
+    const channelExpenses = sb.channel('registro_ventas_expenses_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `tenant_id=eq.${tenantId}` }, () => loadSales(false))
+      .subscribe()
+      
+    return () => { 
+      sb.removeChannel(channelSales) 
+      sb.removeChannel(channelExpenses)
+    }
   }, [tenantId, loadSales])
 
   // ===== FILTRADO =====
