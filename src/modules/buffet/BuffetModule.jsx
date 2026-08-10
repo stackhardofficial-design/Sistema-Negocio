@@ -408,7 +408,7 @@ export default function BuffetModule() {
       })
 
       playBeep()
-      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : `📒 ${selectedDebtor.name}`
+      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : paymentMethod === 'multipagos' ? '💳 Multipagos' : `📒 ${selectedDebtor?.name || ''}`
       toast(`${qty}x ${bp.name} enviado a la cocina · ${formatMoney(total)} · ${methodLabel}`, 'success')
 
       setQuantity(1)
