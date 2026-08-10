@@ -7,7 +7,7 @@ import {
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
-import {  Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag , AlertTriangle } from 'lucide-react'
+import {  Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag , AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react'
 
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
