@@ -325,7 +325,7 @@ export default function BuffetModule() {
       } else {
         // Es compuesto, verificar stock de cada componente
         for (const comp of (bp.buffet_product_components || [])) {
-          const reqQty = comp.quantity * qty
+          const reqQty = (comp.quantity || 1) * qty
           if (comp.component_product_id && comp.products) {
             if (comp.products.stock !== null && comp.products.stock < reqQty) {
               toast(`El insumo "${comp.products.name}" no tiene suficiente stock (${comp.products.stock} disp.)`, 'danger')

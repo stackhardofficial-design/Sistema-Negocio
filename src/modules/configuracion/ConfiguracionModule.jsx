@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant, dbLogActivity } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Settings, Plus, Edit2, Trash2, Tag, Building2, RefreshCw } from 'lucide-react'
+import { Settings, Plus, Edit2, Trash2, Tag, Building2, RefreshCw, Download } from 'lucide-react'
 
 export default function ConfiguracionModule() {
   const { tenantId, tenant, setTenant, userInfo, toast } = useApp()
@@ -13,6 +13,20 @@ export default function ConfiguracionModule() {
   const [saving, setSaving] = useState(false)
   const [tenantForm, setTenantForm] = useState({ name: '' })
   const [savingTenant, setSavingTenant] = useState(false)
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+  async function handleInstallApp() {
+    if (window.deferredPrompt) {
+      window.deferredPrompt.prompt()
+      const { outcome } = await window.deferredPrompt.userChoice
+      if (outcome === 'accepted') window.deferredPrompt = null
+    } else if (isIOS) {
+      alert("Para instalar en iPhone/iPad:\n1. Toc el botn 'Compartir' (el cuadrado con la flecha hacia arriba) en Safari.\n2. Seleccion 'Agregar a Inicio'.")
+    } else {
+      alert("La app ya est instalada o tu navegador no lo soporta. En Android, pods buscar la opcin 'Agregar a la pantalla principal' en el men de Chrome.")
+    }
+  }
+
 
   async function load() {
     if (!tenantId) { setLoading(false); return; }
@@ -112,6 +126,19 @@ export default function ConfiguracionModule() {
       </div>
 
       <div className="module-content" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '700px' }}>
+        {/* Instalar App */}
+        <div className="card">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '0.95rem' }}>
+            <Download size={16} color="var(--accent)" /> Instalar Sistema
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Descargá e instalá esta app en tu PC, Android o iPhone para un acceso más rápido, a pantalla completa y sin distracciones.
+          </p>
+          <button onClick={handleInstallApp} className="btn btn-primary btn-sm">
+            <Download size={14} /> Instalar Aplicación
+          </button>
+        </div>
+
         {/* Negocio */}
         <div className="card">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '0.95rem' }}>

@@ -288,7 +288,7 @@ export default function VentasModule() {
         return
       }
 
-      if (product.stock <= 0) {
+      if (!product.is_composite && product.stock !== null && product.stock <= 0) {
         toast(`Error: El producto "${product.name}" no tiene stock disponible`, 'danger')
         setBarcodeInput('')
         return
