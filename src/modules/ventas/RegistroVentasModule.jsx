@@ -55,7 +55,12 @@ export default function RegistroVentasModule() {
     if (!tenantId) { setLoadingSales(false); return }
     if (showLoading) setLoadingSales(true)
     try {
-      const data = await dbGetSales(tenantId, { limit: 500 })
+      const opts = {}
+      if (filterDateFrom) opts.dateFrom = new Date(filterDateFrom + 'T00:00:00-03:00').toISOString()
+      if (filterDateTo) opts.dateTo = new Date(filterDateTo + 'T23:59:59-03:00').toISOString()
+      if (!filterDateFrom && !filterDateTo) opts.limit = 500
+      
+      const data = await dbGetSales(tenantId, opts)
       
       const exps = await dbGetExpenses(tenantId, { dateFrom: filterDateFrom, dateTo: filterDateTo })
       const incomes = exps.filter(e => e.expense_type === 'ingreso').map(e => ({
