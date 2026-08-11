@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Menu, ShieldAlert } from 'lucide-react'
 import { AppProvider, useApp } from './lib/AppContext.jsx'
-import { dbGetSession, dbGetUserInfo, dbGetTenant } from './lib/supabase.js'
+import { dbGetSession, dbGetUserInfo, dbGetTenant, sb } from './lib/supabase.js'
 import Login from './components/Login.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import MobileNav from './components/MobileNav.jsx'
@@ -114,6 +114,32 @@ function AppShell() {
     }
     init()
   }, [])
+
+  // Realtime: escuchar cambios en los permisos del usuario logueado
+  useEffect(() => {
+    if (!user?.id) return
+
+    const channel = sb.channel('user-permissions-sync')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'users',
+        filter: `id=eq.${user.id}`
+      }, (payload) => {
+        const updated = payload.new
+        if (updated) {
+          setUserInfo(prev => ({
+            ...prev,
+            access_modules: updated.access_modules,
+            role: updated.role,
+            name: updated.name,
+          }))
+        }
+      })
+      .subscribe()
+
+    return () => { sb.removeChannel(channel) }
+  }, [user?.id])
 
   if (loading) {
     return (
