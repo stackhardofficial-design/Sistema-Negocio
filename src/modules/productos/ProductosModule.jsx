@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetProducts, dbGetCategories, dbCreateProduct,
-  dbUpdateProduct, dbDeleteProduct, lookupBarcode, dbLogActivity,
+  dbUpdateProduct, dbDeleteProduct, dbHardDeleteProduct, lookupBarcode, dbLogActivity,
   dbCreateCategory, dbDeleteCategory, dbCreateExpense, dbEnsureExpenseCategory, dbSetProductComponents
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
-import {  Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag , AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react'
+import {  Package, Plus, Search, Edit2, Trash2, Barcode, RefreshCw, ExternalLink, Tag , AlertTriangle, ChevronUp, ChevronDown, Power } from 'lucide-react'
 
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
@@ -610,7 +610,10 @@ export default function ProductosModule() {
                           <button onClick={() => openEdit(p)} className="btn btn-secondary btn-sm">
                             <Edit2 size={12} />
                           </button>
-                          <button onClick={() => handleDelete(p)} className="btn btn-danger btn-sm">
+                          <button onClick={() => handleToggleActive(p)} className="btn btn-secondary btn-sm" title={p.is_active ? 'Desactivar' : 'Activar'}>
+                            <Power size={12} color={p.is_active ? 'var(--warning)' : 'var(--success)'} />
+                          </button>
+                          <button onClick={() => handleHardDelete(p)} className="btn btn-danger btn-sm" title="Eliminar definitivamente">
                             <Trash2 size={12} />
                           </button>
                         </div>
