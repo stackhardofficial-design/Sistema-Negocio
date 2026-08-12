@@ -223,6 +223,11 @@ export async function dbDeleteProduct(id) {
   if (error) throw error
 }
 
+export async function dbHardDeleteProduct(id) {
+  const { error } = await sb.from('products').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function dbSetProductComponents(compositeProductId, componentsList) {
   await sb.from('product_components').delete().eq('composite_product_id', compositeProductId)
   if (!componentsList || componentsList.length === 0) return
