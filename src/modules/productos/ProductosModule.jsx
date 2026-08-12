@@ -182,6 +182,31 @@ export default function ProductosModule() {
     }
   }
 
+  async function handleToggleActive(product) {
+    const action = product.is_active ? 'Desactivar' : 'Activar'
+    if (!confirm(`¿${action} "${product.name}"?`)) return
+    try {
+      await dbUpdateProduct(product.id, { is_active: !product.is_active })
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'product', product.id, { name: product.name, barcode: product.barcode, action: action })
+      toast(`Producto ${action.toLowerCase()}do`, 'success')
+      load()
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    }
+  }
+
+  async function handleHardDelete(product) {
+    if (!confirm(`¿ELIMINAR DEFINITIVAMENTE "${product.name}"? Esta acción no se puede deshacer.`)) return
+    try {
+      await dbHardDeleteProduct(product.id)
+      await dbLogActivity(tenantId, userInfo?.id, 'hard_delete', 'product', product.id, { name: product.name, barcode: product.barcode })
+      toast('Producto eliminado definitivamente', 'success')
+      load()
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    }
+  }
+
   async function load(showLoading = true) {
     if (!tenantId) { setLoading(false); return; }
     if (showLoading) setLoading(true)
