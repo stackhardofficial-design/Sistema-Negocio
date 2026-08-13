@@ -4,11 +4,11 @@ import {
   sb, dbGetBuffetProducts, dbCreateBuffetProduct, dbUpdateBuffetProduct,
   dbGetBuffetOrders, dbGetProducts, dbSetBuffetProductComponents,
   dbCreateBuffetOrder, dbUpdateBuffetOrderStatus, dbLogActivity,
-  dbCreateSale, dbGetDebtors, dbAddDebtorCharge, dbUpdateProduct
+  dbCreateSale, dbGetDebtors, dbAddDebtorCharge, dbUpdateProduct, dbHardDeleteBuffetProduct
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import BarcodeScanner from '../../components/BarcodeScanner'
-import { Coffee, Plus, Edit2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle, X, Zap, ChevronDown, Minus } from 'lucide-react'
+import { Coffee, Plus, Edit2, Clock, Utensils, User, Package as PkgIcon, AlertTriangle, X, Zap, ChevronDown, Minus, Trash2, Power } from 'lucide-react'
 
 function formatMoney(n) { return `$${Number(n || 0).toLocaleString('es-AR')}` }
 function formatTime(d) { return new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }
@@ -584,9 +584,17 @@ export default function BuffetModule() {
                         }
                       </td>
                       <td>
-                        <button onClick={() => openEdit(bp)} className="btn btn-secondary btn-sm">
-                          <Edit2 size={12} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button onClick={() => openEdit(bp)} className="btn btn-secondary btn-sm">
+                            <Edit2 size={12} />
+                          </button>
+                          <button onClick={() => handleToggleActive(bp)} className="btn btn-secondary btn-sm" title={bp.is_active ? 'Desactivar' : 'Activar'}>
+                            <Power size={12} color={bp.is_active ? 'var(--warning)' : 'var(--success)'} />
+                          </button>
+                          <button onClick={() => handleHardDelete(bp)} className="btn btn-danger btn-sm" title="Eliminar definitivamente">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

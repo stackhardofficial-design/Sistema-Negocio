@@ -522,6 +522,11 @@ export async function dbUpdateBuffetProduct(id, payload) {
   return data
 }
 
+export async function dbHardDeleteBuffetProduct(id) {
+  const { error } = await sb.from('buffet_products').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function dbSetBuffetIngredients(buffetProductId, ingredientsList) {
   // Delete old
   await sb.from('buffet_ingredients').delete().eq('buffet_product_id', buffetProductId)
