@@ -242,6 +242,28 @@ export default function BuffetModule() {
     setProductModal({ open: true, edit: bp })
   }
 
+  async function handleToggleActive(p) {
+    if (!confirm(`¿Seguro que querés ${p.is_active ? 'desactivar' : 'activar'} "${p.name}"?`)) return
+    try {
+      await dbUpdateBuffetProduct(p.id, { is_active: !p.is_active })
+      toast(`Producto ${p.is_active ? 'desactivado' : 'activado'}`, 'success')
+      load()
+    } catch (err) {
+      toast('Error al cambiar estado', 'error')
+    }
+  }
+
+  async function handleHardDelete(p) {
+    if (!confirm(`¡ATENCIÓN! ¿Eliminar DEFINITIVAMENTE el producto "${p.name}"? Esto no se puede deshacer.`)) return
+    try {
+      await dbHardDeleteBuffetProduct(p.id)
+      toast('Producto eliminado', 'success')
+      load()
+    } catch (err) {
+      toast('Error al eliminar producto', 'error')
+    }
+  }
+
   async function handleSave() {
     if (!form.name.trim()) return toast('El nombre es obligatorio', 'warning')
     if (!form.price) return toast('El precio es obligatorio', 'warning')
