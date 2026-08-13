@@ -219,6 +219,8 @@ export default function FinanzasModule() {
     return true
   })
 
+  const totalFilteredGastos = filteredExpenses.reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? -Number(e.amount) : Number(e.amount)), 0)
+
   function parseDescription(desc) {
     if (!desc) return { isProduct: false, text: '-' }
     try {
@@ -409,7 +411,7 @@ export default function FinanzasModule() {
               <div className="fade-in card" style={{ padding: '0', overflow: 'hidden' }}>
                 <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1rem' }}>Historial de Gastos</h3>
+                    <h3 style={{ margin: 0, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>Historial de Gastos <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--danger)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>Total: {formatMoney(totalFilteredGastos)}</span></h3>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <select className="input-sm" value={gastosTypeFilter} onChange={e => setGastosTypeFilter(e.target.value)} style={{ padding: '6px' }}>
                         <option value="all">Todos los Tipos</option>
