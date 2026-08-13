@@ -173,9 +173,27 @@ export default function FinanzasModule() {
   const gananciaNeta = totalIngresos - totalGastos
 
   // Desglose de ingresos por método de pago
-  const ingresoEfectivo = salesSummary.filter(s => !s.payment_method || s.payment_method === 'efectivo').reduce((a, s) => a + Number(s.total_amount), 0)
-  const ingresoTransferencia = salesSummary.filter(s => s.payment_method === 'transferencia').reduce((a, s) => a + Number(s.total_amount), 0)
-  const ingresoDeudor = salesSummary.filter(s => s.payment_method === 'deudor').reduce((a, s) => a + Number(s.total_amount), 0)
+  let ingresoEfectivo = 0
+  let ingresoTransferencia = 0
+  let ingresoDeudor = 0
+  let ingresoMultipagoSinResolver = 0
+
+  salesSummary.forEach(s => {
+    if (!s.payment_method || s.payment_method === 'efectivo') {
+      ingresoEfectivo += Number(s.total_amount)
+    } else if (s.payment_method === 'transferencia') {
+      ingresoTransferencia += Number(s.total_amount)
+    } else if (s.payment_method === 'deudor') {
+      ingresoDeudor += Number(s.total_amount)
+    } else if (s.payment_method === 'multipagos') {
+      if (s.cash_amount != null && s.transfer_amount != null) {
+        ingresoEfectivo += Number(s.cash_amount)
+        ingresoTransferencia += Number(s.transfer_amount)
+      } else {
+        ingresoMultipagoSinResolver += Number(s.total_amount)
+      }
+    }
+  })
 
   // Agrupar para planilla semanal
   // Filas: Categorías, Columnas: Fechas únicas en el rango (o últimos 7 días)
