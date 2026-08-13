@@ -192,13 +192,15 @@ export default function FinanzasModule() {
     } else if (s.payment_method === 'deudor') {
       ingresoDeudor += Number(s.total_amount)
     } else if (s.payment_method === 'multipagos') {
-      if (s.cash_amount != null && s.transfer_amount != null) {
-        ingresoEfectivo += Number(s.cash_amount)
-        ingresoTransferencia += Number(s.transfer_amount)
-      } else {
-        ingresoMultipagoSinResolver += Number(s.total_amount)
+        const cash = Number(s.cash_amount || 0)
+        const trans = Number(s.transfer_amount || 0)
+        if ((cash + trans) < Number(s.total_amount)) {
+          ingresoMultipagoSinResolver += Number(s.total_amount)
+        } else {
+          ingresoEfectivo += cash
+          ingresoTransferencia += trans
+        }
       }
-    }
   })
 
   // Agrupar para planilla semanal
