@@ -398,6 +398,7 @@ export default function FinanzasModule() {
                         { label: '💵 Efectivo', value: ingresoEfectivo, color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' },
                         { label: '📲 Mercado Pago', value: ingresoTransferencia, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)' },
                         { label: '📒 Deudor (fiado)', value: ingresoDeudor, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)' },
+                        ...(ingresoMultipagoSinResolver > 0 ? [{ label: '💸 Multipago (Pendiente)', value: ingresoMultipagoSinResolver, color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)' }] : [])
                       ].map(m => (
                         <div key={m.label} style={{
                           flex: 1, minWidth: '140px',
