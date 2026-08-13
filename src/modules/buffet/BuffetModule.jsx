@@ -260,7 +260,11 @@ export default function BuffetModule() {
       toast('Producto eliminado', 'success')
       load()
     } catch (err) {
-      toast('Error al eliminar producto', 'error')
+      if (err.message?.includes('violates foreign key constraint') || err.code === '23503') {
+        toast('No se puede eliminar: el producto ya tiene ventas registradas. Por favor, desactívalo.', 'error')
+      } else {
+        toast(`Error al eliminar: ${err.message}`, 'error')
+      }
     }
   }
 
