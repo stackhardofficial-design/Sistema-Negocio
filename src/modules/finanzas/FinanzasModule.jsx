@@ -345,6 +345,34 @@ export default function FinanzasModule() {
             {/* TAB: RESUMEN */}
             {activeTab === 'resumen' && (
               <div className="fade-in">
+                
+                {/* DINERO ESPERADO */}
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '250px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>EFECTIVO ESPERADO EN CAJA</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#10b981' }}>
+                      {formatMoney(
+                        ingresoEfectivo 
+                        - expenses.filter(e => e.payment_method === 'efectivo' && e.expense_type !== 'ingreso').reduce((a, b) => a + Number(b.amount), 0) 
+                        + expenses.filter(e => e.payment_method === 'efectivo' && e.expense_type === 'ingreso').reduce((a, b) => a + Number(b.amount), 0)
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Ingresos Efectivo - Gastos Efectivo</div>
+                  </div>
+                  
+                  <div style={{ flex: 1, minWidth: '250px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px' }}>DINERO ESPERADO EN CUENTA (Transf.)</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#3b82f6' }}>
+                      {formatMoney(
+                        ingresoTransferencia 
+                        - expenses.filter(e => e.payment_method === 'transferencia' && e.expense_type !== 'ingreso').reduce((a, b) => a + Number(b.amount), 0)
+                        + expenses.filter(e => e.payment_method === 'transferencia' && e.expense_type === 'ingreso').reduce((a, b) => a + Number(b.amount), 0)
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Ingresos Transf. - Gastos Transf.</div>
+                  </div>
+                </div>
+
                 <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: '24px' }}>
                   <div className="kpi-card">
                     <div className="kpi-label" style={{ color: 'var(--success)' }}>
@@ -618,6 +646,7 @@ export default function FinanzasModule() {
                     <Plus size={16} /> Nueva Categoría
                   </button>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
                   {categories.map(cat => (
                     <div key={cat.id} className="card" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -654,6 +683,18 @@ export default function FinanzasModule() {
             >
               <option value="">Seleccionar categoría...</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Método de Pago</label>
+            <select
+              value={expenseForm.payment_method || 'efectivo'}
+              onChange={e => setExpenseForm({ ...expenseForm, payment_method: e.target.value })}
+              disabled={saving}
+            >
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="transferencia">💳 Transferencia</option>
             </select>
           </div>
 
