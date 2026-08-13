@@ -401,6 +401,14 @@ export default function RegistroVentasModule() {
             </select>
           </div>
           <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
+            <label className="form-label">Origen</label>
+            <select value={filterOrigin} onChange={e => setFilterOrigin(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="kiosco">Kiosco</option>
+              <option value="buffet">Buffet</option>
+            </select>
+          </div>
+          <div className="form-group" style={{ flex: '1', minWidth: '140px' }}>
             <label className="form-label">Método de pago</label>
             <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)}>
               <option value="">Todos</option>
