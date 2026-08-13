@@ -39,6 +39,8 @@ export default function FinanzasModule() {
   const [gastosSearch, setGastosSearch] = useState('')
   const [gastosTypeFilter, setGastosTypeFilter] = useState('all')
   const [gastosCategoryFilter, setGastosCategoryFilter] = useState('all')
+  const [gastosSort, setGastosSort] = useState('date_desc')
+  const [gastosUserFilter, setGastosUserFilter] = useState('all')
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
@@ -227,6 +229,7 @@ export default function FinanzasModule() {
   const filteredExpenses = expenses.filter(exp => {
     if (gastosTypeFilter !== 'all' && exp.expense_type !== gastosTypeFilter) return false
     if (gastosCategoryFilter !== 'all' && exp.category_id !== gastosCategoryFilter) return false
+    if (gastosUserFilter !== 'all' && exp.users?.name !== gastosUserFilter) return false
     if (gastosSearch.trim()) {
       const q = gastosSearch.toLowerCase()
       const desc = exp.description?.toLowerCase() || ''
@@ -235,6 +238,12 @@ export default function FinanzasModule() {
       if (!desc.includes(q) && !cat.includes(q) && !amount.includes(q)) return false
     }
     return true
+  }).sort((a, b) => {
+    if (gastosSort === 'date_desc') return new Date(b.expense_date) - new Date(a.expense_date)
+    if (gastosSort === 'date_asc') return new Date(a.expense_date) - new Date(b.expense_date)
+    if (gastosSort === 'amount_desc') return b.amount - a.amount
+    if (gastosSort === 'amount_asc') return a.amount - b.amount
+    return 0
   })
 
   const totalFilteredGastos = filteredExpenses.reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? -Number(e.amount) : Number(e.amount)), 0)
@@ -431,20 +440,35 @@ export default function FinanzasModule() {
                 <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                     <h3 style={{ margin: 0, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>Historial de Gastos <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--danger)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>Total: {formatMoney(totalFilteredGastos)}</span></h3>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <select className="input-sm" value={gastosTypeFilter} onChange={e => setGastosTypeFilter(e.target.value)} style={{ padding: '6px' }}>
-                        <option value="all">Todos los Tipos</option>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <select className="input-sm" value={gastosSort} onChange={e => setGastosSort(e.target.value)} style={{ padding: '6px' }} title="Ordenar por">
+                        <option value="date_desc">Más recientes</option>
+                        <option value="date_asc">Más antiguos</option>
+                        <option value="amount_desc">Mayor monto</option>
+                        <option value="amount_asc">Menor monto</option>
+                      </select>
+                      <select className="input-sm" value={gastosTypeFilter} onChange={e => setGastosTypeFilter(e.target.value)} style={{ padding: '6px' }} title="Tipo">
+                        <option value="all">Tipos: Todos</option>
                         <option value="fixed">Fijos</option>
                         <option value="variable">Variables</option>
                       </select>
-                      <select className="input-sm" value={gastosCategoryFilter} onChange={e => setGastosCategoryFilter(e.target.value)} style={{ padding: '6px' }}>
-                        <option value="all">Todas las Categorías</option>
+                      <select className="input-sm" value={gastosCategoryFilter} onChange={e => setGastosCategoryFilter(e.target.value)} style={{ padding: '6px' }} title="Categoría">
+                        <option value="all">Categorías: Todas</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <select className="input-sm" value={gastosUserFilter} onChange={e => setGastosUserFilter(e.target.value)} style={{ padding: '6px' }} title="Usuario">
+                        <option value="all">Usuarios: Todos</option>
+                        {[...new Set(expenses.map(e => e.users?.name).filter(Boolean))].map(u => <option key={u} value={u}>{u}</option>)}
                       </select>
                       <div style={{ position: 'relative' }}>
                         <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input type="text" placeholder="Buscar..." value={gastosSearch} onChange={e => setGastosSearch(e.target.value)} className="input-sm" style={{ paddingLeft: '32px', width: '180px', padding: '6px 6px 6px 32px' }} />
                       </div>
+                      {(gastosTypeFilter !== 'all' || gastosCategoryFilter !== 'all' || gastosUserFilter !== 'all' || gastosSearch !== '' || gastosSort !== 'date_desc') && (
+                        <button onClick={() => { setGastosTypeFilter('all'); setGastosCategoryFilter('all'); setGastosUserFilter('all'); setGastosSearch(''); setGastosSort('date_desc'); }} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>
+                          Limpiar
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -505,6 +529,17 @@ export default function FinanzasModule() {
                         })
                       )}
                     </tbody>
+                    <tfoot>
+                      <tr style={{ background: 'var(--bg-secondary)', borderTop: '2px solid var(--border)' }}>
+                        <td colSpan="6" style={{ padding: '16px', textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                          TOTAL FILTRADO:
+                        </td>
+                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: 800, fontSize: '1.2rem', color: totalFilteredGastos > 0 ? 'var(--text-primary)' : (totalFilteredGastos < 0 ? 'var(--success)' : 'var(--text-muted)') }}>
+                          {formatMoney(Math.abs(totalFilteredGastos))} {totalFilteredGastos < 0 ? '(Ingreso)' : ''}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
