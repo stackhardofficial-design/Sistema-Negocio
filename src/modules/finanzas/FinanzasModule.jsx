@@ -44,7 +44,7 @@ export default function FinanzasModule() {
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
-  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'variable' })
+  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'variable', payment_method: 'efectivo' })
   
   const [catModal, setCatModal] = useState({ open: false, edit: null })
   const [catForm, setCatForm] = useState({ name: '' })
@@ -107,7 +107,8 @@ export default function FinanzasModule() {
           amount: parseFloat(expenseForm.amount),
           description: expenseForm.description?.trim(),
           expense_date: expenseForm.expense_date,
-          expense_type: expenseForm.expense_type || 'variable'
+          expense_type: expenseForm.expense_type || 'variable',
+          payment_method: expenseForm.payment_method || 'efectivo'
         })
         await dbLogActivity(tenantId, userInfo?.id, 'create', 'expense', created.id, { amount: expenseForm.amount, category_id: expenseForm.category_id })
         toast(expenseForm.expense_type === 'ingreso' ? 'Ingreso registrado' : 'Gasto registrado', 'success')
@@ -296,7 +297,7 @@ export default function FinanzasModule() {
           </h1>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={() => {
-              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'ingreso' })
+              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'ingreso', payment_method: 'efectivo' })
               setExpenseModal({ open: true, edit: null })
             }} className="btn btn-success">
               <TrendingUp size={16} /> Registrar Ingreso
@@ -407,7 +408,7 @@ export default function FinanzasModule() {
                         { label: '💵 Efectivo', value: ingresoEfectivo, color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' },
                         { label: '📲 Mercado Pago', value: ingresoTransferencia, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)' },
                         { label: '📒 Deudor (fiado)', value: ingresoDeudor, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)' },
-                        ...(ingresoMultipagoSinResolver > 0 ? [{ label: '💸 Multipago (Pendiente)', value: ingresoMultipagoSinResolver, color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)' }] : [])
+                        { label: '💸 Multipago (Pendiente)', value: ingresoMultipagoSinResolver, color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.3)' }
                       ].map(m => (
                         <div key={m.label} style={{
                           flex: 1, minWidth: '140px',
