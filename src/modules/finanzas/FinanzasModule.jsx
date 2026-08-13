@@ -14,9 +14,12 @@ import {
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
 }
-function formatDate(d) {
-  return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+  function formatDate(d) {
+    if (!d) return ''
+    if (d.includes('T')) return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const [year, month, day] = d.split('-')
+    return `${day}/${month}/${year}`
+  }
 
 export default function FinanzasModule() {
   const { tenantId, userInfo, toast } = useApp()
