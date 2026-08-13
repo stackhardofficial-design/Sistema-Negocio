@@ -39,7 +39,8 @@ export default function RegistroVentasModule() {
   const [filterUser, setFilterUser] = useState('')
   const [filterSearch, setFilterSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('') // '' | 'completed' | 'cancelled'
-  const [filterPayment, setFilterPayment] = useState('') // '' | 'efectivo' | 'transferencia' | 'deudor'
+  const [filterPayment, setFilterPayment] = useState('')
+  const [filterOrigin, setFilterOrigin] = useState('') // '' | 'kiosco' | 'buffet' // '' | 'efectivo' | 'transferencia' | 'deudor'
 
   // Los totales se calculan dinámicamente más abajo con useMemo
 
@@ -106,6 +107,12 @@ export default function RegistroVentasModule() {
     return sales.filter(s => {
       if (filterStatus && s.status !== filterStatus) return false
       if (filterPayment && s.payment_method !== filterPayment) return false
+      if (filterOrigin && s.sale_items) {
+        const hasK = s.sale_items.some(i => !i.buffet_product_id)
+        const hasB = s.sale_items.some(i => i.buffet_product_id)
+        if (filterOrigin === 'kiosco' && !hasK) return false
+        if (filterOrigin === 'buffet' && !hasB) return false
+      }
       
       if (filterDateFrom || filterDateTo) {
         const saleDate = new Date(s.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
@@ -126,7 +133,7 @@ export default function RegistroVentasModule() {
       }
       return true
     })
-  }, [sales, filterStatus, filterPayment, filterDateFrom, filterDateTo, filterUser, filterSearch])
+  }, [sales, filterStatus, filterPayment, filterDateFrom, filterDateTo, filterUser, filterSearch, filterOrigin])
 
   // ===== TOTALES (Dinámicos según filtros) =====
   const totals = useMemo(() => {
@@ -312,7 +319,7 @@ export default function RegistroVentasModule() {
     }
   }
 
-  const activeFilters = !!(filterDateFrom || filterDateTo || filterUser || filterSearch || filterStatus || filterPayment)
+  const activeFilters = !!(filterDateFrom || filterDateTo || filterUser || filterSearch || filterStatus || filterPayment || filterOrigin)
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -404,7 +411,7 @@ export default function RegistroVentasModule() {
             </select>
           </div>
           <button
-            onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterUser(''); setFilterSearch(''); setFilterStatus(''); setFilterPayment('') }}
+            onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setFilterUser(''); setFilterSearch(''); setFilterStatus(''); setFilterPayment(''); setFilterOrigin('') }}
             className="btn btn-secondary btn-sm"
           >
             <X size={14} /> Limpiar
