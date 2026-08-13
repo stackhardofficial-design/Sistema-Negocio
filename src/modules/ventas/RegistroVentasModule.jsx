@@ -132,8 +132,36 @@ export default function RegistroVentasModule() {
   const totals = useMemo(() => {
     const completed = filteredSales.filter(s => s.status === 'completed' && !s.is_income)
     const autoconsumo = filteredSales.filter(s => s.status === 'autoconsumo')
+    
+    let salesKiosco = 0
+    let salesBuffet = 0
+    let totalSales = 0
+
+    completed.forEach(s => {
+      totalSales += (s.total_amount || 0)
+      
+      if (s.sale_items && s.sale_items.length > 0) {
+        let k = 0
+        let b = 0
+        s.sale_items.forEach(i => {
+          const itemTotal = (i.unit_price || 0) * (i.quantity || 1)
+          if (i.buffet_product_id) {
+            b += itemTotal
+          } else {
+            k += itemTotal
+          }
+        })
+        salesKiosco += k
+        salesBuffet += b
+      } else {
+        salesKiosco += (s.total_amount || 0)
+      }
+    })
+
     return {
-      sales: completed.reduce((a, s) => a + (s.total_amount || 0), 0),
+      sales: totalSales,
+      salesKiosco,
+      salesBuffet,
       profit: completed.reduce((a, s) => a + ((s.total_amount || 0) - (s.total_cost || 0)), 0) - autoconsumo.reduce((a, s) => a + (s.total_cost || 0), 0),
       count: completed.length + autoconsumo.length
     }
@@ -305,6 +333,10 @@ export default function RegistroVentasModule() {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total vendido</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)' }}>{formatMoney(totals.sales)}</div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '2px' }}>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>K: {formatMoney(totals.salesKiosco)}</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>B: {formatMoney(totals.salesBuffet)}</span>
+            </div>
           </div>
           <div style={{ width: '1px', height: '32px', background: 'var(--border)' }} />
           <div style={{ textAlign: 'center' }}>
