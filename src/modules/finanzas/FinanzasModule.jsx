@@ -44,6 +44,7 @@ export default function FinanzasModule() {
   const [gastosCategoryFilter, setGastosCategoryFilter] = useState('all')
   const [gastosSort, setGastosSort] = useState('date_desc')
   const [gastosUserFilter, setGastosUserFilter] = useState('all')
+  const [gastosPaymentFilter, setGastosPaymentFilter] = useState('all')
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
@@ -236,6 +237,7 @@ export default function FinanzasModule() {
     if (gastosTypeFilter !== 'all' && exp.expense_type !== gastosTypeFilter) return false
     if (gastosCategoryFilter !== 'all' && exp.category_id !== gastosCategoryFilter) return false
     if (gastosUserFilter !== 'all' && exp.users?.name !== gastosUserFilter) return false
+    if (gastosPaymentFilter !== 'all' && (exp.payment_method || 'efectivo') !== gastosPaymentFilter) return false
     if (gastosSearch.trim()) {
       const q = gastosSearch.toLowerCase()
       const desc = exp.description?.toLowerCase() || ''
@@ -494,12 +496,17 @@ export default function FinanzasModule() {
                         <option value="all">Usuarios: Todos</option>
                         {[...new Set(expenses.map(e => e.users?.name).filter(Boolean))].map(u => <option key={u} value={u}>{u}</option>)}
                       </select>
+                      <select className="input-sm" value={gastosPaymentFilter} onChange={e => setGastosPaymentFilter(e.target.value)} style={{ padding: '6px' }} title="Método de pago">
+                        <option value="all">Pago: Todos</option>
+                        <option value="efectivo">💵 Efectivo</option>
+                        <option value="transferencia">📲 Transferencia</option>
+                      </select>
                       <div style={{ position: 'relative' }}>
                         <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input type="text" placeholder="Buscar..." value={gastosSearch} onChange={e => setGastosSearch(e.target.value)} className="input-sm" style={{ paddingLeft: '32px', width: '180px', padding: '6px 6px 6px 32px' }} />
                       </div>
-                      {(gastosTypeFilter !== 'all' || gastosCategoryFilter !== 'all' || gastosUserFilter !== 'all' || gastosSearch !== '' || gastosSort !== 'date_desc') && (
-                        <button onClick={() => { setGastosTypeFilter('all'); setGastosCategoryFilter('all'); setGastosUserFilter('all'); setGastosSearch(''); setGastosSort('date_desc'); }} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>
+                      {(gastosTypeFilter !== 'all' || gastosCategoryFilter !== 'all' || gastosUserFilter !== 'all' || gastosPaymentFilter !== 'all' || gastosSearch !== '' || gastosSort !== 'date_desc') && (
+                        <button onClick={() => { setGastosTypeFilter('all'); setGastosCategoryFilter('all'); setGastosUserFilter('all'); setGastosPaymentFilter('all'); setGastosSearch(''); setGastosSort('date_desc'); }} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>
                           Limpiar
                         </button>
                       )}
