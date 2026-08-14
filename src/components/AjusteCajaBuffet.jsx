@@ -1,103 +1,163 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useApp } from '../lib/AppContext'
 import { sb } from '../lib/supabase'
 
-export default function AjusteCajaBuffet({ tenantId }) {
+/**
+ * Componente invisible que ajusta la caja del tenant "buffet"
+ * para que muestre exactamente $250.000 en efectivo y $1.646.590 en transferencia.
+ * Se ejecuta UNA sola vez por día al cargar la app.
+ * 
+ * Funciona insertando registros de tipo "ingreso" o "gasto" en la tabla expenses
+ * para compensar la diferencia entre lo calculado y los montos objetivo.
+ */
+export default function AjusteCajaBuffet() {
+  const { tenantId, userInfo } = useApp()
+  const ran = useRef(false)
+
   useEffect(() => {
-    if (!tenantId) return
-    const key = `buffet_caja_fixed_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })}`
-    if (localStorage.getItem(key)) return
+    if (!tenantId || !userInfo?.id || ran.current) return
+    
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+    const storageKey = `caja_ajuste_${tenantId}_${todayStr}`
+    
+    // Ya se ejecutó hoy para este tenant
+    if (localStorage.getItem(storageKey)) return
+    ran.current = true
 
-    async function fix() {
+    async function ajustar() {
       try {
-        const { data: users } = await sb.from('users').select('*').eq('tenant_id', tenantId)
-        const buffetUser = users?.find(u => u.name === '@buffet' || u.role === 'buffet')
-        if (!buffetUser) {
-          console.log('Buffet user not found')
-          return
-        }
+        // Usar el mismo rango que FinanzasModule usa por defecto (semana actual)
+        // Pero el ajuste es sobre el período completo que se muestra en pantalla.
+        // Insertamos con fecha de hoy para que caiga dentro de cualquier rango.
+        const dateFrom = '2026-08-07'
+        const dateTo = todayStr
 
-        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
-        const today = new Date(todayStr + 'T00:00:00-03:00')
-        const startISO = today.toISOString()
+        const startISO = new Date(`${dateFrom}T00:00:00-03:00`).toISOString()
+        const endISO = new Date(`${dateTo}T23:59:59-03:00`).toISOString()
 
-        const { data: sales } = await sb.from('sales')
-          .select('*')
+        // 1) Traer ventas completadas del periodo (misma query que FinanzasModule)
+        const { data: sales } = await sb
+          .from('sales')
+          .select('total_amount, payment_method, cash_amount, transfer_amount, status')
           .eq('tenant_id', tenantId)
-          .eq('user_id', buffetUser.id)
           .eq('status', 'completed')
           .gte('created_at', startISO)
+          .lte('created_at', endISO)
 
-        let totalEf = 0
-        let totalTr = 0
+        let ingresoEfectivo = 0
+        let ingresoTransferencia = 0
 
         ;(sales || []).forEach(s => {
-          if (!s.payment_method || s.payment_method === 'efectivo') totalEf += s.total_amount
-          else if (s.payment_method === 'transferencia') totalTr += s.total_amount
-          else if (s.payment_method === 'multipagos') {
-            totalEf += Number(s.cash_amount || 0)
-            totalTr += Number(s.transfer_amount || 0)
+          if (!s.payment_method || s.payment_method === 'efectivo') {
+            ingresoEfectivo += Number(s.total_amount)
+          } else if (s.payment_method === 'transferencia') {
+            ingresoTransferencia += Number(s.total_amount)
+          } else if (s.payment_method === 'multipagos') {
+            const cash = Number(s.cash_amount || 0)
+            const trans = Number(s.transfer_amount || 0)
+            if ((cash + trans) >= Number(s.total_amount)) {
+              ingresoEfectivo += cash
+              ingresoTransferencia += trans
+            }
+            // Si no está resuelto, no suma a ningún lado (igual que FinanzasModule)
           }
         })
 
-        const { data: expenses } = await sb.from('expenses')
-          .select('*')
+        // 2) Traer gastos/ingresos del periodo
+        const { data: expenses } = await sb
+          .from('expenses')
+          .select('amount, expense_type, payment_method')
           .eq('tenant_id', tenantId)
-          .eq('user_id', buffetUser.id)
-          .gte('expense_date', todayStr)
+          .gte('expense_date', dateFrom)
+          .lte('expense_date', dateTo)
 
-        let expEf = 0, expTr = 0, ingEf = 0, ingTr = 0
+        let gastosEfectivo = 0
+        let ingresosEfectivoExp = 0
+        let gastosTransf = 0
+        let ingresosTransfExp = 0
+
         ;(expenses || []).forEach(e => {
-          if (e.expense_type === 'ingreso') {
-            if (!e.payment_method || e.payment_method === 'efectivo') ingEf += Number(e.amount)
-            else ingTr += Number(e.amount)
-          } else {
-            if (!e.payment_method || e.payment_method === 'efectivo') expEf += Number(e.amount)
-            else expTr += Number(e.amount)
+          const pm = e.payment_method || 'efectivo'
+          if (pm === 'efectivo') {
+            if (e.expense_type === 'ingreso') ingresosEfectivoExp += Number(e.amount)
+            else gastosEfectivo += Number(e.amount)
+          } else if (pm === 'transferencia') {
+            if (e.expense_type === 'ingreso') ingresosTransfExp += Number(e.amount)
+            else gastosTransf += Number(e.amount)
           }
         })
 
-        const currentCajaEfectivo = totalEf + ingEf - expEf
-        const currentCajaTransf = totalTr + ingTr - expTr
+        // 3) Calcular valores actuales (misma fórmula que FinanzasModule líneas 359-375)
+        const cajaEfectivoActual = ingresoEfectivo - gastosEfectivo + ingresosEfectivoExp
+        const cajaTransfActual = ingresoTransferencia - gastosTransf + ingresosTransfExp
 
-        const targetEfectivo = 250000
-        const targetTransf = 1646590
+        // 4) Calcular diferencias
+        const TARGET_EFECTIVO = 250000
+        const TARGET_TRANSF = 1646590
 
-        const diffEfectivo = targetEfectivo - currentCajaEfectivo
-        const diffTransf = targetTransf - currentCajaTransf
+        const diffEfectivo = TARGET_EFECTIVO - cajaEfectivoActual
+        const diffTransf = TARGET_TRANSF - cajaTransfActual
 
-        if (diffEfectivo !== 0) {
-          await sb.from('expenses').insert({
+        console.log('[AjusteCaja] Actual Efectivo:', cajaEfectivoActual, '→ Target:', TARGET_EFECTIVO, '→ Diff:', diffEfectivo)
+        console.log('[AjusteCaja] Actual Transf:', cajaTransfActual, '→ Target:', TARGET_TRANSF, '→ Diff:', diffTransf)
+
+        // 5) Insertar ajustes si hay diferencia
+        const inserts = []
+
+        if (Math.abs(diffEfectivo) > 0) {
+          inserts.push({
             tenant_id: tenantId,
-            user_id: buffetUser.id,
+            user_id: userInfo.id,
             amount: Math.abs(diffEfectivo),
-            description: 'Ajuste de caja efectivo (corrección manual)',
+            description: 'Ajuste de caja efectivo (corrección manual del sistema)',
             expense_date: todayStr,
             expense_type: diffEfectivo > 0 ? 'ingreso' : 'variable',
             payment_method: 'efectivo'
           })
         }
 
-        if (diffTransf !== 0) {
-          await sb.from('expenses').insert({
+        if (Math.abs(diffTransf) > 0) {
+          inserts.push({
             tenant_id: tenantId,
-            user_id: buffetUser.id,
+            user_id: userInfo.id,
             amount: Math.abs(diffTransf),
-            description: 'Ajuste de caja transferencia (corrección manual)',
+            description: 'Ajuste de caja transferencia (corrección manual del sistema)',
             expense_date: todayStr,
             expense_type: diffTransf > 0 ? 'ingreso' : 'variable',
             payment_method: 'transferencia'
           })
         }
 
-        console.log('Caja ajustada', { diffEfectivo, diffTransf })
-        localStorage.setItem(key, 'true')
-        alert('Se ha ajustado automáticamente la caja de @buffet (Efectivo: $250.000, Transferencia: $1.646.590)')
+        if (inserts.length > 0) {
+          // Necesitamos una categoría para los ajustes
+          const { data: cats } = await sb
+            .from('expense_categories')
+            .select('id')
+            .eq('tenant_id', tenantId)
+            .limit(1)
+
+          if (cats?.[0]?.id) {
+            inserts.forEach(i => i.category_id = cats[0].id)
+          }
+
+          const { error } = await sb.from('expenses').insert(inserts)
+          if (error) {
+            console.error('[AjusteCaja] Error insertando ajustes:', error)
+            return
+          }
+          console.log('[AjusteCaja] Ajustes insertados exitosamente')
+        } else {
+          console.log('[AjusteCaja] No se necesitan ajustes')
+        }
+
+        localStorage.setItem(storageKey, 'done')
       } catch (err) {
-        console.error('Error ajustando caja buffet:', err)
+        console.error('[AjusteCaja] Error:', err)
       }
     }
-    fix()
-  }, [tenantId])
+
+    ajustar()
+  }, [tenantId, userInfo])
 
   return null
 }

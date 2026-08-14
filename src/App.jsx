@@ -163,7 +163,7 @@ function AppShell() {
 
   return (
     <div className="app-layout">
-      <AjusteCajaBuffet tenantId={tenantId} />
+      <AjusteCajaBuffet />
       {/* Desktop Sidebar */}
       <Sidebar />
 
