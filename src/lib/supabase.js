@@ -318,17 +318,38 @@ export async function dbGetSales(tenantId, opts = {}) {
 }
 
 export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {
-  let q = sb.from('sales')
-    .select('total_amount, total_cost, created_at, payment_method, cash_amount, transfer_amount')
-    .eq('tenant_id', tenantId)
-    .eq('status', 'completed')
+  let allData = []
+  let page = 0
+  const pageSize = 900
+  let hasMore = true
+
+  while (hasMore) {
+    let q = sb.from('sales')
+      .select('total_amount, total_cost, created_at, payment_method, cash_amount, transfer_amount')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'completed')
+      
+    if (dateFrom) q = q.gte('created_at', dateFrom)
+    if (dateTo) q = q.lte('created_at', dateTo)
     
-  if (dateFrom) q = q.gte('created_at', dateFrom)
-  if (dateTo) q = q.lte('created_at', dateTo)
+    q = q.range(page * pageSize, (page + 1) * pageSize - 1)
+    
+    const { data, error } = await q
+    if (error) {
+      console.error("dbGetSaleSummary error:", error)
+      break
+    }
+    
+    if (data && data.length > 0) {
+      allData = [...allData, ...data]
+      if (data.length < pageSize) hasMore = false
+      else page++
+    } else {
+      hasMore = false
+    }
+  }
   
-  const { data, error } = await q
-  if (error) console.error("dbGetSaleSummary error:", error)
-  return data || []
+  return allData
 }
 
 export async function dbCreateSale(tenantId, userId, items, totalAmount, totalCost, paymentMethod = 'efectivo', debtorId = null) {
