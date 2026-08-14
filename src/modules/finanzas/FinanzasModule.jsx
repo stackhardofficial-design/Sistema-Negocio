@@ -169,6 +169,7 @@ export default function FinanzasModule() {
   // ===== CÁLCULOS =====
   const ingresosExtra = expenses.filter(e => e.expense_type === 'ingreso').reduce((acc, e) => acc + Number(e.amount), 0)
   const totalVentas = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0)
+  const totalIngresos = totalVentas + ingresosExtra
   
   // Excluir ajustes manuales para obtener el valor puro
   const gastosVisuales = expenses.filter(e => e.expense_type !== 'ingreso' && !(e.description || '').toLowerCase().includes('ajuste'))
