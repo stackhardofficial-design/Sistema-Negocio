@@ -45,6 +45,7 @@ export default function FinanzasModule() {
   const [gastosSort, setGastosSort] = useState('date_desc')
   const [gastosUserFilter, setGastosUserFilter] = useState('all')
   const [gastosPaymentFilter, setGastosPaymentFilter] = useState('all')
+  const [displayLimit, setDisplayLimit] = useState(100)
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
@@ -253,6 +254,11 @@ export default function FinanzasModule() {
     if (gastosSort === 'amount_asc') return a.amount - b.amount
     return 0
   })
+
+  // Reset display limit when filters change
+  useEffect(() => {
+    setDisplayLimit(100)
+  }, [gastosTypeFilter, gastosCategoryFilter, gastosUserFilter, gastosPaymentFilter, gastosSearch, gastosSort, expenses])
 
   const totalFilteredGastos = filteredExpenses.reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? -Number(e.amount) : Number(e.amount)), 0)
 
@@ -536,7 +542,7 @@ export default function FinanzasModule() {
                           </td>
                         </tr>
                       ) : (
-                        filteredExpenses.map(exp => {
+                        filteredExpenses.slice(0, displayLimit).map(exp => {
                           const parsed = parseDescription(exp.description)
                           return (
                             <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-soft)', fontSize: '0.9rem' }}>
@@ -582,6 +588,28 @@ export default function FinanzasModule() {
                       </tr>
                     </tfoot>
                   </table>
+                  
+                  {filteredExpenses.length > displayLimit && (
+                    <div style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                        Mostrando {displayLimit} de {filteredExpenses.length} gastos
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setDisplayLimit(prev => prev + 100)}
+                        >
+                          Cargar más
+                        </button>
+                        <button 
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setDisplayLimit(filteredExpenses.length)}
+                        >
+                          Ver todos
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

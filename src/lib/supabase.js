@@ -811,21 +811,40 @@ export async function dbDeleteExpenseCategory(id) {
 }
 
 export async function dbGetExpenses(tenantId, opts = {}) {
-  let q = sb.from('expenses')
-    .select('*, expense_categories(name, icon), users(name)')
-    .eq('tenant_id', tenantId)
-    .or('is_active.eq.true,is_active.is.null')
+  let allData = []
+  let offset = 0
+  const limit = opts.limit || 1000
+  let fetchMore = true
 
-  if (opts.dateFrom) q = q.gte('expense_date', opts.dateFrom)
-  if (opts.dateTo) q = q.lte('expense_date', opts.dateTo)
-  if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
+  while (fetchMore) {
+    let q = sb.from('expenses')
+      .select('*, expense_categories(name, icon), users(name)')
+      .eq('tenant_id', tenantId)
+      .or('is_active.eq.true,is_active.is.null')
 
-  q = q.order('expense_date', { ascending: false }).order('created_at', { ascending: false })
-  
-  if (opts.limit) q = q.limit(opts.limit)
+    if (opts.dateFrom) q = q.gte('expense_date', opts.dateFrom)
+    if (opts.dateTo) q = q.lte('expense_date', opts.dateTo)
+    if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
 
-  const { data } = await q
-  return data || []
+    q = q.order('expense_date', { ascending: false }).order('created_at', { ascending: false })
+    q = q.range(offset, offset + limit - 1)
+
+    const { data, error } = await q
+    if (error) throw error
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data]
+      offset += limit
+      // If we got fewer rows than the limit, or a specific limit was requested, stop fetching
+      if (data.length < limit || opts.limit) {
+        fetchMore = false
+      }
+    } else {
+      fetchMore = false
+    }
+  }
+
+  return allData
 }
 
 export async function dbCreateExpense(payload) {
