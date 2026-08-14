@@ -258,20 +258,42 @@ export async function lookupBarcode(barcode) {
 
 // ===== SALES =====
 export async function dbGetSales(tenantId, opts = {}) {
-  let q = sb.from('sales')
-    .select('*, sale_items(*, products(name, barcode, categories(name)), buffet_products(name, barcode)), users!sales_user_id_fkey(name), debtors(name)')
-    .eq('tenant_id', tenantId)
+  const PAGE_SIZE = 1000
 
-  if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
-  if (opts.dateTo) q = q.lte('created_at', opts.dateTo)
-  if (opts.userId) q = q.eq('user_id', opts.userId)
-  if (opts.status) q = q.eq('status', opts.status)
+  // Si hay un límite explícito y es <= PAGE_SIZE, consulta simple
+  if (opts.limit && opts.limit <= PAGE_SIZE) {
+    let q = sb.from('sales')
+      .select('*, sale_items(*, products(name, barcode, categories(name)), buffet_products(name, barcode)), users!sales_user_id_fkey(name), debtors(name)')
+      .eq('tenant_id', tenantId)
+    if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
+    if (opts.dateTo) q = q.lte('created_at', opts.dateTo)
+    if (opts.userId) q = q.eq('user_id', opts.userId)
+    if (opts.status) q = q.eq('status', opts.status)
+    q = q.order('created_at', { ascending: false }).limit(opts.limit)
+    const { data } = await q
+    return data || []
+  }
 
-  q = q.order('created_at', { ascending: false })
-  if (opts.limit) q = q.limit(opts.limit)
-
-  const { data } = await q
-  return data || []
+  // Paginación automática: trae TODAS las filas en lotes de PAGE_SIZE
+  let allData = []
+  let page = 0
+  while (true) {
+    let q = sb.from('sales')
+      .select('*, sale_items(*, products(name, barcode, categories(name)), buffet_products(name, barcode)), users!sales_user_id_fkey(name), debtors(name)')
+      .eq('tenant_id', tenantId)
+    if (opts.dateFrom) q = q.gte('created_at', opts.dateFrom)
+    if (opts.dateTo) q = q.lte('created_at', opts.dateTo)
+    if (opts.userId) q = q.eq('user_id', opts.userId)
+    if (opts.status) q = q.eq('status', opts.status)
+    q = q.order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+    const { data } = await q
+    if (!data || data.length === 0) break
+    allData = allData.concat(data)
+    if (data.length < PAGE_SIZE) break
+    page++
+  }
+  return allData
 }
 
 export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {

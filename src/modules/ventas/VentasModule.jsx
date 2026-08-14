@@ -662,7 +662,7 @@ export default function VentasModule() {
             <input
               type="number"
               min="1"
-              max="999"
+              max="99999"
               value={quantity}
               onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
               disabled={loading || !canScan}

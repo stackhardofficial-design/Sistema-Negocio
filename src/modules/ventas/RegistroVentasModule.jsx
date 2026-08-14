@@ -51,6 +51,7 @@ export default function RegistroVentasModule() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [multipagoModal, setMultipagoModal] = useState({ open: false, sale: null, cash: '', transfer: '' })
   const [buffetProducts, setBuffetProducts] = useState([])
+  const [displayLimit, setDisplayLimit] = useState(100)
 
   const loadSales = useCallback(async (showLoading = true) => {
     if (!tenantId) { setLoadingSales(false); return }
@@ -59,7 +60,7 @@ export default function RegistroVentasModule() {
       const opts = {}
       if (filterDateFrom) opts.dateFrom = new Date(filterDateFrom + 'T00:00:00-03:00').toISOString()
       if (filterDateTo) opts.dateTo = new Date(filterDateTo + 'T23:59:59-03:00').toISOString()
-      if (!filterDateFrom && !filterDateTo) opts.limit = 500
+      // Sin límite: dbGetSales pagina automáticamente para traer TODAS las ventas
       
       const data = await dbGetSales(tenantId, opts)
       
@@ -78,6 +79,7 @@ export default function RegistroVentasModule() {
       
       const merged = [...data, ...incomes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       setSales(merged)
+      setDisplayLimit(100)
     } catch (err) {
       console.error(err)
     } finally {
@@ -438,6 +440,7 @@ export default function RegistroVentasModule() {
             <p style={{ fontSize: '0.85rem' }}>No hay ventas que coincidan con los filtros</p>
           </div>
         ) : (
+          <>
           <div className="table-wrap">
             <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse' }}>
               <thead>
@@ -452,7 +455,7 @@ export default function RegistroVentasModule() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSales.map(sale => (
+                {filteredSales.slice(0, displayLimit).map(sale => (
                   <SaleRow
                     key={sale.id}
                     sale={sale}
@@ -466,6 +469,26 @@ export default function RegistroVentasModule() {
               </tbody>
             </table>
           </div>
+          {filteredSales.length > displayLimit && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0', gap: '12px', alignItems: 'center' }}>
+              <button
+                onClick={() => setDisplayLimit(prev => prev + 100)}
+                className="btn btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ChevronDown size={16} />
+                Cargar más ({displayLimit} de {filteredSales.length})
+              </button>
+              <button
+                onClick={() => setDisplayLimit(filteredSales.length)}
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.75rem' }}
+              >
+                Mostrar todas
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
