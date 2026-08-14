@@ -169,13 +169,19 @@ export default function FinanzasModule() {
   // ===== CÁLCULOS =====
   const ingresosExtra = expenses.filter(e => e.expense_type === 'ingreso').reduce((acc, e) => acc + Number(e.amount), 0)
   const totalVentas = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0)
-  const totalIngresos = totalVentas + ingresosExtra
   
+  // Excluir ajustes manuales para que el dashboard sea intuitivo visualmente
+  const gastosVisuales = expenses.filter(e => e.expense_type !== 'ingreso' && !(e.description || '').toLowerCase().includes('ajuste'))
+  const totalGastosVisual = gastosVisuales.reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalFijos = gastosVisuales.filter(e => e.expense_type === 'fixed').reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalVariables = gastosVisuales.filter(e => !e.expense_type || e.expense_type === 'variable').reduce((acc, e) => acc + Number(e.amount), 0)
+  
+  // Ganancia Neta pura (Ventas reales - Gastos reales)
+  const gananciaNeta = totalVentas - totalGastosVisual
+
+  // Mantenemos totalGastos completo SOLO para el cálculo interno de la Caja (Efectivo/Transferencia)
   const gastosReales = expenses.filter(e => e.expense_type !== 'ingreso')
   const totalGastos = gastosReales.reduce((acc, e) => acc + Number(e.amount), 0)
-  const totalFijos = gastosReales.filter(e => e.expense_type === 'fixed').reduce((acc, e) => acc + Number(e.amount), 0)
-  const totalVariables = gastosReales.filter(e => !e.expense_type || e.expense_type === 'variable').reduce((acc, e) => acc + Number(e.amount), 0)
-  const gananciaNeta = totalIngresos - totalGastos
 
   // Desglose de ingresos por método de pago
   let ingresoEfectivo = 0
@@ -400,7 +406,7 @@ export default function FinanzasModule() {
                     <div className="kpi-label" style={{ color: 'var(--danger)' }}>
                       <TrendingDown size={16} /> Egresos Totales
                     </div>
-                    <div className="kpi-value">{formatMoney(totalGastos)}</div>
+                    <div className="kpi-value">{formatMoney(totalGastosVisual)}</div>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: '6px' }}>
                         <Lock size={14} style={{display:'inline', verticalAlign:'middle'}}/> Fijos: {formatMoney(totalFijos)}
