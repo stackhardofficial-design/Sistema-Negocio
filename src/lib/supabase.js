@@ -318,12 +318,15 @@ export async function dbGetSales(tenantId, opts = {}) {
 }
 
 export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {
-  const { data, error } = await sb.from('sales')
+  let q = sb.from('sales')
     .select('total_amount, total_cost, created_at, payment_method, cash_amount, transfer_amount')
     .eq('tenant_id', tenantId)
     .eq('status', 'completed')
-    .gte('created_at', dateFrom)
-    .lte('created_at', dateTo)
+    
+  if (dateFrom) q = q.gte('created_at', dateFrom)
+  if (dateTo) q = q.lte('created_at', dateTo)
+  
+  const { data, error } = await q
   if (error) console.error("dbGetSaleSummary error:", error)
   return data || []
 }

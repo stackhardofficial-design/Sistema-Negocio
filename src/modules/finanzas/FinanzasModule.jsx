@@ -33,12 +33,8 @@ export default function FinanzasModule() {
   const [loading, setLoading] = useState(true)
 
   // Filtros
-  const [dateFrom, setDateFrom] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 7) // Últimos 7 días por defecto
-    return d.toISOString().split('T')[0]
-  })
-  const [dateTo, setDateTo] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }))
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [gastosSearch, setGastosSearch] = useState('')
   const [gastosTypeFilter, setGastosTypeFilter] = useState('all')
   const [gastosCategoryFilter, setGastosCategoryFilter] = useState('all')
@@ -68,8 +64,8 @@ export default function FinanzasModule() {
       
       // Obtener resumen de ventas para calcular ingresos
       // Ajustar zona horaria a Argentina (-03:00) para calcular correctamente el inicio y fin del día
-      const startISO = new Date(`${dateFrom}T00:00:00-03:00`).toISOString()
-      const endISO = new Date(`${dateTo}T23:59:59-03:00`).toISOString()
+      const startISO = dateFrom ? new Date(`${dateFrom}T00:00:00-03:00`).toISOString() : null
+      const endISO = dateTo ? new Date(`${dateTo}T23:59:59-03:00`).toISOString() : null
       const sales = await dbGetSaleSummary(tenantId, startISO, endISO)
       setSalesSummary(sales)
 
