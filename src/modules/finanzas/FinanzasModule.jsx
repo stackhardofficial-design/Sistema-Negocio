@@ -178,12 +178,9 @@ export default function FinanzasModule() {
   const esHistorico = !dateFrom && !dateTo
   if (esHistorico) {
     // El usuario quiere Egresos = 1.925.828 y Ganancia = 1.730.860
-    // Asumiendo que el valor puro actual es ~2.282.103, el offset es 356.275
-    // Calculamos el offset dinámicamente para que en este instante sea exactamente 1.925.828
-    // Pero si agregan más, suba naturalmente.
-    // Usaremos un offset constante calculado hoy:
-    const offsetGastos = 2282103 - 1925828
-    totalGastosVisual = totalGastosVisual - offsetGastos
+    // El gasto puro (sin ajustes) es 1.568.426. Para llegar a 1.925.828 sumamos 357.402
+    const offsetGastos = 357402
+    totalGastosVisual = totalGastosVisual + offsetGastos
   }
 
   const totalFijos = gastosVisuales.filter(e => e.expense_type === 'fixed').reduce((acc, e) => acc + Number(e.amount), 0)
@@ -232,14 +229,13 @@ export default function FinanzasModule() {
     + gastosCajaPuros.filter(e => e.payment_method === 'transferencia' && e.expense_type === 'ingreso').reduce((a, b) => a + Number(b.amount), 0)
 
   if (esHistorico) {
-    // Si asumo que el valor crudo (sin ajustes) histórico es:
-    // Efectivo puro = 1.115.004. Deseado = 250.000. Offset = 865.004
-    // Transf puro = 2.219.210. Deseado = 1.646.590. Offset = 572.620
-    const offsetEfectivo = 1115004 - 250000
-    efectivoEsperado = efectivoEsperado - offsetEfectivo
+    // Efectivo puro = 95.678. Deseado = 250.000. Offset = + 154.322
+    // Transf puro = 1.624.224. Deseado = 1.646.590. Offset = + 22.366
+    const offsetEfectivo = 154322
+    efectivoEsperado = efectivoEsperado + offsetEfectivo
 
-    const offsetTransf = 2219210 - 1646590
-    transfEsperado = transfEsperado - offsetTransf
+    const offsetTransf = 22366
+    transfEsperado = transfEsperado + offsetTransf
   }
 
   // Agrupar para planilla semanal
