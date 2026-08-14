@@ -171,11 +171,8 @@ export default function FinanzasModule() {
   }
 
   // ===== CÁLCULOS =====
-  const ingresosExtraGastos = expenses.filter(e => e.expense_type === 'ingreso').reduce((acc, e) => acc + Number(e.amount), 0)
-  const ingresosExtraVentas = salesSummary.filter(s => s.is_income).reduce((acc, s) => acc + Number(s.total_amount), 0)
-  const ingresosExtra = ingresosExtraGastos + ingresosExtraVentas
-  
-  const totalVentas = salesSummary.filter(s => !s.is_income).reduce((acc, s) => acc + Number(s.total_amount), 0)
+  const ingresosExtra = expenses.filter(e => e.expense_type === 'ingreso').reduce((acc, e) => acc + Number(e.amount), 0)
+  const totalVentas = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0)
   const totalIngresos = totalVentas + ingresosExtra
   
   const gastosReales = expenses.filter(e => e.expense_type !== 'ingreso')
