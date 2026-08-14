@@ -172,7 +172,8 @@ export default function FinanzasModule() {
 
   // ===== CÁLCULOS =====
   const ingresosExtra = expenses.filter(e => e.expense_type === 'ingreso').reduce((acc, e) => acc + Number(e.amount), 0)
-  const totalIngresos = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0) + ingresosExtra
+  const totalVentas = salesSummary.reduce((acc, s) => acc + Number(s.total_amount), 0)
+  const totalIngresos = totalVentas + ingresosExtra
   
   const gastosReales = expenses.filter(e => e.expense_type !== 'ingreso')
   const totalGastos = gastosReales.reduce((acc, e) => acc + Number(e.amount), 0)
@@ -391,8 +392,13 @@ export default function FinanzasModule() {
                     <div className="kpi-label" style={{ color: 'var(--success)' }}>
                       <TrendingUp size={16} /> Ingresos (Ventas)
                     </div>
-                    <div className="kpi-value">{formatMoney(totalIngresos)}</div>
+                    <div className="kpi-value">{formatMoney(totalVentas)}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Total de ventas completadas en el periodo</div>
+                    {ingresosExtra > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--accent)', marginTop: '4px', background: 'var(--accent-soft)', padding: '2px 8px', borderRadius: '6px', display: 'inline-block' }}>
+                        + {formatMoney(ingresosExtra)} por ajustes / ingresos manuales
+                      </div>
+                    )}
                   </div>
                   <div className="kpi-card">
                     <div className="kpi-label" style={{ color: 'var(--danger)' }}>
