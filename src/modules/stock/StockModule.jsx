@@ -14,6 +14,7 @@ export default function StockModule() {
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [view, setView] = useState('all') // 'all' | 'low' | 'out'
+  const [displayLimit, setDisplayLimit] = useState(100)
 
   // Modal de confirmación de gasto por ingreso de mercadería
   const [expenseConfirmModal, setExpenseConfirmModal] = useState({ open: false, product: null, added: 0, cost: 0, newStock: 0 })
@@ -168,7 +169,7 @@ export default function StockModule() {
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setDisplayLimit(100); }}
               placeholder="Buscar producto..."
             />
           </div>
@@ -180,7 +181,7 @@ export default function StockModule() {
             ].map(v => (
               <button
                 key={v.id}
-                onClick={() => setView(v.id)}
+                onClick={() => { setView(v.id); setDisplayLimit(100); }}
                 className={`btn btn-sm ${view === v.id ? 'btn-primary' : 'btn-secondary'}`}
               >
                 {v.label}
@@ -207,7 +208,7 @@ export default function StockModule() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => {
+                {filtered.slice(0, displayLimit).map(p => {
                   const isLow = p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock && p.stock > 0
                   const isOut = p.stock !== null && p.stock === 0
                   const isEditing = editingId === p.id
@@ -273,6 +274,28 @@ export default function StockModule() {
                 })}
               </tbody>
             </table>
+            
+            {filtered.length > displayLimit && (
+              <div style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                  Mostrando {displayLimit} de {filtered.length} productos
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <button 
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setDisplayLimit(prev => prev + 100)}
+                  >
+                    Cargar más
+                  </button>
+                  <button 
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setDisplayLimit(filtered.length)}
+                  >
+                    Ver todos
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

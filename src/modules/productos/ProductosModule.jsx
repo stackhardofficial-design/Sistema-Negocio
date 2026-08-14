@@ -105,6 +105,7 @@ export default function ProductosModule() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('')
+  const [displayLimit, setDisplayLimit] = useState(100)
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [modal, setModal] = useState({ open: false, edit: null })
   const [form, setForm] = useState(EMPTY_PRODUCT)
@@ -505,7 +506,7 @@ export default function ProductosModule() {
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setDisplayLimit(100); }}
               placeholder="Buscar por nombre o código..."
             />
           </div>
@@ -580,7 +581,7 @@ export default function ProductosModule() {
                       </div>
                     </td>
                   </tr>
-                ) : sortedFiltered.map(p => {
+                ) : sortedFiltered.slice(0, displayLimit).map(p => {
                   const mg = margin(p)
                   const mk = markup(p)
                   const dispStock = getDisplayStock(p)
@@ -648,6 +649,28 @@ export default function ProductosModule() {
                 })}
               </tbody>
             </table>
+            
+            {sortedFiltered.length > displayLimit && (
+              <div style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                  Mostrando {displayLimit} de {sortedFiltered.length} productos
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <button 
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setDisplayLimit(prev => prev + 100)}
+                  >
+                    Cargar más
+                  </button>
+                  <button 
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setDisplayLimit(sortedFiltered.length)}
+                  >
+                    Ver todos
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -100,6 +100,7 @@ export default function HistorialModule() {
   const [filterEntity, setFilterEntity] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [displayLimit, setDisplayLimit] = useState(100)
 
   async function load() {
     if (!tenantId) { setLoading(false); return; }
@@ -162,7 +163,7 @@ export default function HistorialModule() {
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setDisplayLimit(100); }}
               placeholder="Buscar en historial..."
             />
           </div>
@@ -223,7 +224,7 @@ export default function HistorialModule() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(log => {
+                {filtered.slice(0, displayLimit).map(log => {
                   const action = ACTION_BADGES[log.action] || { label: log.action, class: 'badge-neutral' }
                   return (
                     <tr key={log.id}>
@@ -250,10 +251,32 @@ export default function HistorialModule() {
                 })}
               </tbody>
             </table>
+            
+            {filtered.length > displayLimit && (
+              <div style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>
+                  Mostrando {displayLimit} de {filtered.length} registros
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <button 
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setDisplayLimit(prev => prev + 100)}
+                  >
+                    Cargar más
+                  </button>
+                  <button 
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setDisplayLimit(filtered.length)}
+                  >
+                    Ver todos
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          {filtered.length} registros encontrados
+          {filtered.length} registros encontrados en total
         </div>
       </div>
     </div>

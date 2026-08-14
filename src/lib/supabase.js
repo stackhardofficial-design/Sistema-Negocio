@@ -177,19 +177,40 @@ export async function dbDeleteCategory(id) {
 
 // ===== PRODUCTS =====
 export async function dbGetProducts(tenantId, opts = {}) {
-  let q = sb.from('products')
-    .select('*, categories(name, icon), product_components!product_components_composite_product_id_fkey(*)')
-    .eq('tenant_id', tenantId)
-  if (!opts.includeInactive) q = q.eq('is_active', true)
-  if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
-  if (opts.search) q = q.ilike('name', `%${opts.search}%`)
-  q = q.order('name')
-  const { data, error } = await q
-  if (error) {
-    console.error('Error fetching products:', error)
-    throw error
+  let allData = []
+  let offset = 0
+  const limit = opts.limit || 1000
+  let fetchMore = true
+
+  while (fetchMore) {
+    let q = sb.from('products')
+      .select('*, categories(name, icon), product_components!product_components_composite_product_id_fkey(*)')
+      .eq('tenant_id', tenantId)
+    if (!opts.includeInactive) q = q.eq('is_active', true)
+    if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
+    if (opts.search) q = q.ilike('name', `%${opts.search}%`)
+    
+    q = q.order('name')
+    q = q.range(offset, offset + limit - 1)
+
+    const { data, error } = await q
+    if (error) {
+      console.error('Error fetching products:', error)
+      throw error
+    }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data]
+      offset += limit
+      if (data.length < limit || opts.limit) {
+        fetchMore = false
+      }
+    } else {
+      fetchMore = false
+    }
   }
-  return data || []
+
+  return allData
 }
 
 export async function dbGetProductByBarcode(tenantId, barcode) {
