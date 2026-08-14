@@ -13,7 +13,7 @@ export default function AjusteCajaBuffet() {
   useEffect(() => {
     if (!tenantId || !userInfo?.id) return
 
-    const KEY = 'caja_ajuste_FINAL_v1'
+    const KEY = 'caja_ajuste_FINAL_v2'
     if (localStorage.getItem(KEY) === 'done') return
     // Marcar INMEDIATAMENTE antes de hacer cualquier cosa para evitar doble ejecución
     localStorage.setItem(KEY, 'done')
@@ -34,8 +34,8 @@ export default function AjusteCajaBuffet() {
           {
             tenant_id: tenantId,
             user_id: userInfo.id,
-            amount: 180677,
-            description: 'Ajuste caja efectivo - corrección final única',
+            amount: 684327,
+            description: 'Ajuste de caja efectivo definitivo',
             expense_date: todayStr,
             expense_type: 'variable',
             payment_method: 'efectivo',
@@ -44,10 +44,10 @@ export default function AjusteCajaBuffet() {
           {
             tenant_id: tenantId,
             user_id: userInfo.id,
-            amount: 266500,
-            description: 'Ajuste caja transferencia - corrección final única',
+            amount: 839120,
+            description: 'Ajuste caja transferencia definitivo',
             expense_date: todayStr,
-            expense_type: 'ingreso',
+            expense_type: 'variable',
             payment_method: 'transferencia',
             ...(categoryId && { category_id: categoryId })
           }
