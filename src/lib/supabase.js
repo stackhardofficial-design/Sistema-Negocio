@@ -319,7 +319,7 @@ export async function dbGetSales(tenantId, opts = {}) {
 
 export async function dbGetSaleSummary(tenantId, dateFrom, dateTo) {
   const { data } = await sb.from('sales')
-    .select('total_amount, total_cost, created_at, payment_method, cash_amount, transfer_amount')
+    .select('total_amount, total_cost, created_at, payment_method, cash_amount, transfer_amount, is_income')
     .eq('tenant_id', tenantId)
     .eq('status', 'completed')
     .gte('created_at', dateFrom)
