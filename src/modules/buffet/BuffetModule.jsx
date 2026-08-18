@@ -390,7 +390,8 @@ export default function BuffetModule() {
       } else {
         // Es compuesto, verificar stock de cada componente usando datos locales
         for (const comp of (bp.buffet_product_components || [])) {
-          const reqQty = (comp.quantity || 1) * qty
+          const compQty = comp.quantity > 99 ? 1 : (comp.quantity || 1)
+          const reqQty = compQty * qty
           if (comp.component_product_id && comp.products) {
             if (comp.products.stock !== null && comp.products.stock < reqQty) {
               toast(`El insumo "${comp.products.name}" no tiene suficiente stock (${comp.products.stock} disp.)`, 'danger')
@@ -443,7 +444,8 @@ export default function BuffetModule() {
       } else if (bp.is_composite) {
         // Descontar a los componentes usando datos locales para buffet
         for (const comp of (bp.buffet_product_components || [])) {
-          const reqQty = (comp.quantity || 1) * qty
+          const compQty = comp.quantity > 99 ? 1 : (comp.quantity || 1)
+          const reqQty = compQty * qty
           if (comp.component_product_id && comp.products?.stock !== null) {
             await dbUpdateProduct(comp.component_product_id, { stock: comp.products.stock - reqQty })
           } else if (comp.component_buffet_product_id) {
@@ -510,7 +512,7 @@ export default function BuffetModule() {
     if (p.is_composite) {
       return (p.buffet_product_components || []).reduce((acc, c) => {
         const { cost } = resolveComponentData(c)
-        const qty = Math.min(c.quantity || 1, 99)
+        const qty = c.quantity > 99 ? 1 : (c.quantity || 1)
         return acc + (cost * qty)
       }, 0)
     }
@@ -523,7 +525,7 @@ export default function BuffetModule() {
       let minStock = Infinity
       for (const c of p.buffet_product_components) {
         const { stock: itemStock } = resolveComponentData(c)
-        const qty = Math.min(c.quantity || 1, 99)
+        const qty = c.quantity > 99 ? 1 : (c.quantity || 1)
         const possible = Math.floor((itemStock ?? 0) / qty)
         if (possible < minStock) minStock = possible
       }
