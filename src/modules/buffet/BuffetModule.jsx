@@ -230,13 +230,23 @@ export default function BuffetModule() {
       stock: bp.stock ?? '',
       min_stock: bp.min_stock ?? '',
       description: bp.description || '',
-      components: (bp.buffet_product_components || []).map(c => ({
-        is_buffet: !!c.component_buffet_product_id,
-        component_id: c.component_buffet_product_id || c.component_product_id,
-        quantity: c.quantity,
-        name: c.products?.name || c.buffet_products?.name || 'Desconocido',
-        cost: c.products?.cost_price || c.buffet_products?.cost_price || 0
-      }))
+      components: (bp.buffet_product_components || []).map(c => {
+        const isBuf = !!c.component_buffet_product_id
+        const compId = c.component_buffet_product_id || c.component_product_id
+        let name = 'Desconocido'
+        let cost = 0
+        if (isBuf) {
+          const found = buffetProducts.find(b => b.id === compId)
+          if (found) { name = found.name; cost = found.cost_price || 0 }
+        } else {
+          if (c.products) { name = c.products.name; cost = c.products.cost_price || 0 }
+          else {
+            const found = products.find(p => p.id === compId)
+            if (found) { name = found.name; cost = found.cost_price || 0 }
+          }
+        }
+        return { is_buffet: isBuf, component_id: compId, quantity: c.quantity, name, cost }
+      })
     })
     setProductTypeTab(bp.is_composite ? 'combo' : 'simple')
     setProductModal({ open: true, edit: bp })
@@ -309,7 +319,18 @@ export default function BuffetModule() {
       
       if (is_composite) {
         await dbSetBuffetProductComponents(id, form.components, tenantId)
-        const totalCost = form.components.reduce((acc, c) => acc + (parseFloat(c.cost || 0) * c.quantity), 0)
+        // Calcular costo real resolviendo cada componente desde la lista local
+        const totalCost = form.components.reduce((acc, c) => {
+          let compCost = 0
+          if (c.is_buffet) {
+            const found = buffetProducts.find(bp => bp.id === c.component_id)
+            compCost = found?.cost_price || 0
+          } else {
+            const found = products.find(p => p.id === c.component_id)
+            compCost = found?.cost_price || 0
+          }
+          return acc + (compCost * (c.quantity || 1))
+        }, 0)
         await dbUpdateBuffetProduct(id, { cost_price: totalCost })
       } else {
         await dbSetBuffetProductComponents(id, [], tenantId)
@@ -366,7 +387,7 @@ export default function BuffetModule() {
           return
         }
       } else {
-        // Es compuesto, verificar stock de cada componente
+        // Es compuesto, verificar stock de cada componente usando datos locales
         for (const comp of (bp.buffet_product_components || [])) {
           const reqQty = (comp.quantity || 1) * qty
           if (comp.component_product_id && comp.products) {
@@ -375,9 +396,10 @@ export default function BuffetModule() {
               setSelling(false)
               return
             }
-          } else if (comp.component_buffet_product_id && comp.buffet_products) {
-            if (comp.buffet_products.stock !== null && comp.buffet_products.stock < reqQty) {
-              toast(`El insumo de buffet "${comp.buffet_products.name}" no tiene suficiente stock (${comp.buffet_products.stock} disp.)`, 'danger')
+          } else if (comp.component_buffet_product_id) {
+            const compBp = buffetProducts.find(b => b.id === comp.component_buffet_product_id)
+            if (compBp && compBp.stock !== null && compBp.stock < reqQty) {
+              toast(`El insumo de buffet "${compBp.name}" no tiene suficiente stock (${compBp.stock} disp.)`, 'danger')
               setSelling(false)
               return
             }
@@ -418,13 +440,16 @@ export default function BuffetModule() {
       if (!bp.is_composite && bp.stock !== null) {
         await dbUpdateBuffetProduct(bp.id, { stock: bp.stock - qty })
       } else if (bp.is_composite) {
-        // Descontar a los componentes
+        // Descontar a los componentes usando datos locales para buffet
         for (const comp of (bp.buffet_product_components || [])) {
-          const reqQty = comp.quantity * qty
+          const reqQty = (comp.quantity || 1) * qty
           if (comp.component_product_id && comp.products?.stock !== null) {
             await dbUpdateProduct(comp.component_product_id, { stock: comp.products.stock - reqQty })
-          } else if (comp.component_buffet_product_id && comp.buffet_products?.stock !== null) {
-            await dbUpdateBuffetProduct(comp.component_buffet_product_id, { stock: comp.buffet_products.stock - reqQty })
+          } else if (comp.component_buffet_product_id) {
+            const compBp = buffetProducts.find(b => b.id === comp.component_buffet_product_id)
+            if (compBp && compBp.stock !== null) {
+              await dbUpdateBuffetProduct(comp.component_buffet_product_id, { stock: compBp.stock - reqQty })
+            }
           }
         }
       }
@@ -463,11 +488,28 @@ export default function BuffetModule() {
 
   const activeOrders = orders.filter(o => o.status !== 'delivered')
 
+  // Resuelve los datos reales de un componente, usando la lista local de buffetProducts
+  // en lugar del self-join de Supabase que es poco confiable
+  const resolveComponentData = (c) => {
+    if (c.component_product_id && c.products) {
+      // Componente de tipo kiosco/standard - la data embebida funciona bien
+      return { cost: c.products.cost_price || 0, stock: c.products.stock }
+    }
+    if (c.component_buffet_product_id) {
+      // Componente de tipo buffet - buscar en la lista local en lugar del self-join
+      const found = buffetProducts.find(bp => bp.id === c.component_buffet_product_id)
+      if (found) {
+        return { cost: found.cost_price || 0, stock: found.stock }
+      }
+    }
+    return { cost: 0, stock: 0 }
+  }
+
   const getDisplayCost = (p) => {
     if (p.is_composite) {
       return (p.buffet_product_components || []).reduce((acc, c) => {
-        const cost = c.products?.cost_price || c.buffet_products?.cost_price || 0
-        return acc + (cost * c.quantity)
+        const { cost } = resolveComponentData(c)
+        return acc + (cost * (c.quantity || 1))
       }, 0)
     }
     return p.cost_price || 0
@@ -478,8 +520,8 @@ export default function BuffetModule() {
       if (!p.buffet_product_components || p.buffet_product_components.length === 0) return 0
       let minStock = Infinity
       for (const c of p.buffet_product_components) {
-        const itemStock = c.products?.stock ?? c.buffet_products?.stock ?? 0
-        const possible = Math.floor(itemStock / (c.quantity || 1))
+        const { stock: itemStock } = resolveComponentData(c)
+        const possible = Math.floor((itemStock ?? 0) / (c.quantity || 1))
         if (possible < minStock) minStock = possible
       }
       return minStock === Infinity ? 0 : minStock
