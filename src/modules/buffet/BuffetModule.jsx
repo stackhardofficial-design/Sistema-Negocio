@@ -245,7 +245,8 @@ export default function BuffetModule() {
             if (found) { name = found.name; cost = found.cost_price || 0 }
           }
         }
-        return { is_buffet: isBuf, component_id: compId, quantity: c.quantity, name, cost }
+        const qty = c.quantity > 99 ? 1 : (c.quantity || 1)
+        return { is_buffet: isBuf, component_id: compId, quantity: qty, name, cost }
       })
     })
     setProductTypeTab(bp.is_composite ? 'combo' : 'simple')
@@ -509,7 +510,8 @@ export default function BuffetModule() {
     if (p.is_composite) {
       return (p.buffet_product_components || []).reduce((acc, c) => {
         const { cost } = resolveComponentData(c)
-        return acc + (cost * (c.quantity || 1))
+        const qty = Math.min(c.quantity || 1, 99)
+        return acc + (cost * qty)
       }, 0)
     }
     return p.cost_price || 0
@@ -521,7 +523,8 @@ export default function BuffetModule() {
       let minStock = Infinity
       for (const c of p.buffet_product_components) {
         const { stock: itemStock } = resolveComponentData(c)
-        const possible = Math.floor((itemStock ?? 0) / (c.quantity || 1))
+        const qty = Math.min(c.quantity || 1, 99)
+        const possible = Math.floor((itemStock ?? 0) / qty)
         if (possible < minStock) minStock = possible
       }
       return minStock === Infinity ? 0 : minStock
@@ -825,6 +828,14 @@ export default function BuffetModule() {
                   <Plus size={12} /> Agregar producto
                 </button>
               </div>
+              {form.components.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  <span style={{ flex: '1 1 120px', minWidth: '100px' }}>Origen</span>
+                  <span style={{ flex: '1 1 150px' }}>Producto</span>
+                  <span style={{ flex: '1 1 70px', minWidth: '70px' }}>Cant.</span>
+                  <span style={{ width: '32px' }}></span>
+                </div>
+              )}
               {form.components.map((c, i) => (
                 <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <select
@@ -849,9 +860,11 @@ export default function BuffetModule() {
                   <input
                     type="number"
                     value={c.quantity}
-                    onChange={e => updateComponent(i, 'quantity', parseInt(e.target.value))}
-                    style={{ flex: '1 1 70px', minWidth: '70px' }}
+                    onChange={e => updateComponent(i, 'quantity', Math.min(99, Math.max(1, parseInt(e.target.value) || 1)))}
+                    style={{ flex: '1 1 70px', minWidth: '70px', textAlign: 'center', fontWeight: 600 }}
                     min="1"
+                    max="99"
+                    placeholder="Cant."
                   />
                   <button type="button" onClick={() => removeComponent(i)} className="btn btn-danger btn-sm">
                     <X size={12} />
