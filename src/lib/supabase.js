@@ -926,3 +926,14 @@ export async function dbEnsureExpenseCategory(tenantId, name) {
   if (error) throw error
   return data
 }
+
+// ===== USER THEME =====
+export async function dbUpdateUserTheme(userId, themeColor) {
+  const { data, error } = await sb.from('users')
+    .update({ theme_color: themeColor })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}

@@ -10,6 +10,7 @@ export function AppProvider({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+  const [themeColor, setThemeColor] = useState('amber')
 
   // Global toast notifications
   const [toasts, setToasts] = useState([])
@@ -61,6 +62,7 @@ export function AppProvider({ children }) {
       sidebarCollapsed, setSidebarCollapsed,
       mobileNavOpen, setMobileNavOpen,
       aiOpen, setAiOpen,
+      themeColor, setThemeColor,
       toasts, toast, dismissToast,
       hasRole, isSuperAdmin, isAdmin, isVendedor, hasModuleAccess
     }}>

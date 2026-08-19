@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant, dbLogActivity } from '../../lib/supabase'
+import { sb, dbGetCategories, dbCreateCategory, dbUpdateCategory, dbDeleteCategory, dbUpdateTenant, dbLogActivity, dbUpdateUserTheme } from '../../lib/supabase'
+import { THEMES } from '../../lib/themes'
 import Modal from '../../components/Modal'
-import { Settings, Plus, Edit2, Trash2, Tag, Building2, RefreshCw, Download } from 'lucide-react'
+import { Settings, Plus, Edit2, Trash2, Tag, Building2, RefreshCw, Download, Palette, Check } from 'lucide-react'
 
 export default function ConfiguracionModule() {
-  const { tenantId, tenant, setTenant, userInfo, toast } = useApp()
+  const { tenantId, tenant, setTenant, userInfo, toast, user, themeColor, setThemeColor } = useApp()
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [catModal, setCatModal] = useState({ open: false, edit: null })
@@ -13,6 +14,7 @@ export default function ConfiguracionModule() {
   const [saving, setSaving] = useState(false)
   const [tenantForm, setTenantForm] = useState({ name: '' })
   const [savingTenant, setSavingTenant] = useState(false)
+  const [savingTheme, setSavingTheme] = useState(false)
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
   async function handleInstallApp() {
@@ -21,12 +23,26 @@ export default function ConfiguracionModule() {
       const { outcome } = await window.deferredPrompt.userChoice
       if (outcome === 'accepted') window.deferredPrompt = null
     } else if (isIOS) {
-      alert("Para instalar en iPhone/iPad:\n1. Toc el botn 'Compartir' (el cuadrado con la flecha hacia arriba) en Safari.\n2. Seleccion 'Agregar a Inicio'.")
+      alert("Para instalar en iPhone/iPad:\n1. Tocá el botón 'Compartir' (el cuadrado con la flecha hacia arriba) en Safari.\n2. Seleccioná 'Agregar a Inicio'.")
     } else {
-      alert("La app ya est instalada o tu navegador no lo soporta. En Android, pods buscar la opcin 'Agregar a la pantalla principal' en el men de Chrome.")
+      alert("La app ya está instalada o tu navegador no lo soporta. En Android, podés buscar la opción 'Agregar a la pantalla principal' en el menú de Chrome.")
     }
   }
 
+  async function handleSelectTheme(themeId) {
+    if (themeId === themeColor || savingTheme) return
+    setSavingTheme(true)
+    try {
+      setThemeColor(themeId)
+      await dbUpdateUserTheme(user.id, themeId)
+      toast('Tema actualizado', 'success')
+    } catch (err) {
+      toast(`Error al cambiar tema: ${err.message}`, 'danger')
+      setThemeColor(themeColor) // revert
+    } finally {
+      setSavingTheme(false)
+    }
+  }
 
   async function load() {
     if (!tenantId) { setLoading(false); return; }
@@ -126,6 +142,86 @@ export default function ConfiguracionModule() {
       </div>
 
       <div className="module-content" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '700px' }}>
+
+        {/* Tema de Colores */}
+        <div className="card">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.95rem' }}>
+            <Palette size={16} color="var(--accent)" /> Tema de Colores
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+            Elegí tu color preferido. Se guarda automáticamente para tu usuario.
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: '10px'
+          }}>
+            {THEMES.map(theme => {
+              const isActive = themeColor === theme.id
+              return (
+                <button
+                  key={theme.id}
+                  onClick={() => handleSelectTheme(theme.id)}
+                  disabled={savingTheme}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    background: isActive ? `${theme.accentSoft}` : 'var(--bg-tertiary)',
+                    border: isActive ? `2px solid ${theme.accent}` : '2px solid var(--border)',
+                    cursor: savingTheme ? 'wait' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.borderColor = theme.accent
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = theme.shadowAccent
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) {
+                      e.currentTarget.style.borderColor = 'var(--border)'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }
+                  }}
+                >
+                  {/* Color circle */}
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: theme.accent,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: `0 2px 8px ${theme.accentGlow}`,
+                  }}>
+                    {isActive && <Check size={14} color="#fff" strokeWidth={3} />}
+                  </div>
+                  {/* Theme name */}
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{
+                      fontSize: '0.8rem',
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? theme.accent : 'var(--text-primary)',
+                      lineHeight: 1.2,
+                    }}>
+                      {theme.name}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Instalar App */}
         <div className="card">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '0.95rem' }}>

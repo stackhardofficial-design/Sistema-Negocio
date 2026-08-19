@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { Menu, ShieldAlert } from 'lucide-react'
 import { AppProvider, useApp } from './lib/AppContext.jsx'
 import { dbGetSession, dbGetUserInfo, dbGetTenant, sb } from './lib/supabase.js'
+import { applyTheme } from './lib/themes.js'
 import Login from './components/Login.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import MobileNav from './components/MobileNav.jsx'
@@ -84,7 +85,8 @@ function AppShell() {
     userInfo, setUserInfo,
     tenantId, setTenantId,
     tenant, setTenant,
-    sidebarCollapsed, setSidebarCollapsed
+    sidebarCollapsed, setSidebarCollapsed,
+    themeColor, setThemeColor
   } = useApp()
   const [loading, setLoading] = useState(true)
 
@@ -105,6 +107,10 @@ function AppShell() {
             if (info.role === 'super_admin') {
               // Now handled by Navigation if necessary
             }
+            // Aplicar tema del usuario
+            const userTheme = info.theme_color || 'amber'
+            setThemeColor(userTheme)
+            applyTheme(userTheme)
           }
         }
       } catch (err) {
@@ -115,6 +121,11 @@ function AppShell() {
     }
     init()
   }, [])
+
+  // Reactivo: aplicar tema cuando cambia themeColor
+  useEffect(() => {
+    applyTheme(themeColor)
+  }, [themeColor])
 
   // Realtime: escuchar cambios en los permisos del usuario logueado
   useEffect(() => {
