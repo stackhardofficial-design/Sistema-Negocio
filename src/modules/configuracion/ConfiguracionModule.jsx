@@ -103,9 +103,9 @@ export default function ConfiguracionModule() {
     if (!tenantForm.name.trim()) return toast('El nombre es obligatorio', 'warning')
     setSavingTenant(true)
     try {
-      const updated = await dbUpdateTenant(tenantId, { name: tenantForm.name.trim() })
+      await dbUpdateTenant(tenantId, { name: tenantForm.name.trim() })
       await dbLogActivity(tenantId, userInfo?.id, 'update', 'tenant', tenantId, { name: tenantForm.name.trim() })
-      setTenant(updated)
+      setTenant(prev => ({ ...prev, name: tenantForm.name.trim() }))
       toast('Configuración guardada', 'success')
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
