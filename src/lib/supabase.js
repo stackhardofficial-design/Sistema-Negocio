@@ -68,9 +68,9 @@ export async function dbCreateTenant(payload) {
 }
 
 export async function dbUpdateTenant(id, payload) {
-  const { data, error } = await sb.from('tenants').update(payload).eq('id', id).select().single()
+  const { data, error } = await sb.from('tenants').update(payload).eq('id', id).select()
   if (error) throw error
-  return data
+  return data?.[0]
 }
 
 export async function dbDeleteTenantCascade(tenantId) {
