@@ -937,3 +937,68 @@ export async function dbUpdateUserTheme(userId, themeColor) {
   if (error) throw error
   return data
 }
+
+// ===== TENANT PAYMENTS (Facturación Mensual) =====
+export async function dbGetTenantPayments(tenantId, year) {
+  const { data } = await sb.from('tenant_payments')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('year', year)
+    .order('month')
+  return data || []
+}
+
+export async function dbGetAllTenantPayments(year) {
+  const { data } = await sb.from('tenant_payments')
+    .select('*, tenants(name)')
+    .eq('year', year)
+    .order('month')
+  return data || []
+}
+
+export async function dbSetTenantPaymentStatus(tenantId, year, month, isPaid, userId) {
+  // Upsert: insertar o actualizar el registro del mes
+  const { data, error } = await sb.from('tenant_payments')
+    .upsert({
+      tenant_id: tenantId,
+      year,
+      month,
+      is_paid: isPaid,
+      paid_at: isPaid ? new Date().toISOString() : null,
+      paid_by: isPaid ? userId : null
+    }, { onConflict: 'tenant_id,year,month' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function dbCheckTenantPaymentStatus(tenantId) {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1 // 1-12
+  const day = now.getDate()
+
+  const { data } = await sb.from('tenant_payments')
+    .select('is_paid')
+    .eq('tenant_id', tenantId)
+    .eq('year', year)
+    .eq('month', month)
+    .maybeSingle()
+
+  const isPaid = data?.is_paid === true
+  // Bloqueado si: no pagado Y día > 10
+  const isBlocked = !isPaid && day > 10
+  return { isPaid, isBlocked, year, month, day }
+}
+
+export function subscribeToTenantPayments(tenantId, callback) {
+  return sb.channel(`tenant_payments:${tenantId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'tenant_payments',
+      filter: `tenant_id=eq.${tenantId}`
+    }, callback)
+    .subscribe()
+}

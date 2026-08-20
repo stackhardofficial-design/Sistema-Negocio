@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
 import { dbGetAllTenants, dbCreateTenant, dbUpdateTenant, dbCreateUserForTenant, dbDeleteTenantCascade, dbUpdateUserPassword, sb } from '../../lib/supabase'
 import Modal from '../../components/Modal'
-import { Crown, Plus, Building2, Users, Edit2, Search, ToggleLeft, Trash2 } from 'lucide-react'
+import TenantPaymentsPanel from './TenantPaymentsPanel'
+import { Crown, Plus, Building2, Users, Edit2, Search, ToggleLeft, Trash2, CalendarCheck } from 'lucide-react'
 
 function formatDate(d) { return new Date(d).toLocaleDateString('es-AR') }
 
@@ -10,6 +11,7 @@ const EMPTY_TENANT = { name: '', admin_name: '', admin_email: '', admin_password
 
 export default function SuperAdminModule() {
   const { toast } = useApp()
+  const [activeTab, setActiveTab] = useState('negocios')
   const [tenants, setTenants] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -169,9 +171,11 @@ export default function SuperAdminModule() {
           </span>
           Super Admin
         </h1>
-        <button onClick={() => { setForm(EMPTY_TENANT); setModal({ open: true, edit: null }) }} className="btn btn-primary">
-          <Plus size={16} /> Nuevo negocio
-        </button>
+        {activeTab === 'negocios' && (
+          <button onClick={() => { setForm(EMPTY_TENANT); setModal({ open: true, edit: null }) }} className="btn btn-primary">
+            <Plus size={16} /> Nuevo negocio
+          </button>
+        )}
       </div>
 
       <div className="module-content">
@@ -185,6 +189,49 @@ export default function SuperAdminModule() {
           Panel de administración global · Solo accesible por <strong>tomas@stackhard.com</strong>
         </div>
 
+        {/* Tabs */}
+        <div style={{
+          display: 'flex', gap: '4px', marginBottom: '20px',
+          background: 'var(--bg-tertiary)', borderRadius: '12px',
+          padding: '4px', border: '1px solid var(--border)'
+        }}>
+          <button
+            onClick={() => setActiveTab('negocios')}
+            style={{
+              flex: 1, padding: '10px 16px', borderRadius: '10px',
+              border: 'none', cursor: 'pointer', fontSize: '0.85rem',
+              fontWeight: activeTab === 'negocios' ? 600 : 400,
+              background: activeTab === 'negocios' ? 'var(--bg-primary)' : 'transparent',
+              color: activeTab === 'negocios' ? 'var(--accent)' : 'var(--text-muted)',
+              boxShadow: activeTab === 'negocios' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.2s ease',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+            }}
+          >
+            <Building2 size={16} /> Negocios
+          </button>
+          <button
+            onClick={() => setActiveTab('facturacion')}
+            style={{
+              flex: 1, padding: '10px 16px', borderRadius: '10px',
+              border: 'none', cursor: 'pointer', fontSize: '0.85rem',
+              fontWeight: activeTab === 'facturacion' ? 600 : 400,
+              background: activeTab === 'facturacion' ? 'var(--bg-primary)' : 'transparent',
+              color: activeTab === 'facturacion' ? 'var(--accent)' : 'var(--text-muted)',
+              boxShadow: activeTab === 'facturacion' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.2s ease',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+            }}
+          >
+            <CalendarCheck size={16} /> Facturación
+          </button>
+        </div>
+
+        {/* Tab: Facturación */}
+        {activeTab === 'facturacion' && <TenantPaymentsPanel />}
+
+        {/* Tab: Negocios */}
+        {activeTab === 'negocios' && (<>
         {/* Stats */}
         <div className="kpi-grid" style={{ marginBottom: '20px' }}>
           <div className="kpi-card">
@@ -237,6 +284,7 @@ export default function SuperAdminModule() {
             ))}
           </div>
         )}
+        </>)}
       </div>
 
       <Modal

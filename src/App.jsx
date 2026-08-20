@@ -10,6 +10,7 @@ import MobileNav from './components/MobileNav.jsx'
 import ToastContainer from './components/ToastContainer.jsx'
 import AIAgent from './components/AIAgent.jsx'
 import AjusteCajaBuffet from './components/AjusteCajaBuffet.jsx'
+import PaymentBlockOverlay from './components/PaymentBlockOverlay.jsx'
 import DashboardModule from './modules/dashboard/DashboardModule.jsx'
 import VentasModule from './modules/ventas/VentasModule.jsx'
 import RegistroVentasModule from './modules/ventas/RegistroVentasModule.jsx'
@@ -175,6 +176,7 @@ function AppShell() {
   return (
     <div className="app-layout">
       <AjusteCajaBuffet />
+      <PaymentBlockOverlay />
       {/* Desktop Sidebar */}
       <Sidebar />
 
