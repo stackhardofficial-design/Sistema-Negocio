@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../lib/AppContext'
-import { dbCheckTenantPaymentStatus, subscribeToTenantPayments, unsubscribe } from '../lib/supabase'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { dbCheckTenantPaymentStatus, subscribeToTenantPayments, unsubscribe, dbLogout, dbLogActivity } from '../lib/supabase'
+import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -16,6 +16,19 @@ export default function PaymentBlockOverlay() {
 
   // No bloquear al super_admin
   const isSuperAdmin = hasRole('super_admin')
+
+  async function handleLogout() {
+    try {
+      if (userInfo?.tenant_id) {
+        await dbLogActivity(userInfo.tenant_id, userInfo.id, 'logout', 'user', userInfo.id)
+      }
+      await dbLogout()
+    } catch (e) {
+      console.error('Logout error:', e)
+    } finally {
+      window.location.reload()
+    }
+  }
 
   async function checkPayment() {
     if (!tenantId || isSuperAdmin) {
@@ -161,10 +174,30 @@ export default function PaymentBlockOverlay() {
           background: 'var(--accent-soft)',
           color: 'var(--accent)',
           fontSize: '0.8rem',
-          fontWeight: 500
+          fontWeight: 500,
+          marginBottom: '24px'
         }}>
           <RefreshCw size={14} style={{ animation: 'spin 2s linear infinite' }} />
           Esperando confirmación de pago...
+        </div>
+
+        {/* Botón de cerrar sesión */}
+        <div>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '8px 16px', borderRadius: '10px',
+              background: 'transparent', color: 'var(--text-muted)',
+              border: '1px solid var(--border)', cursor: 'pointer',
+              fontSize: '0.875rem', transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger-soft)'; e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+          >
+            <LogOut size={16} />
+            Cerrar sesión
+          </button>
         </div>
       </div>
 
