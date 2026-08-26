@@ -60,7 +60,12 @@ export default function RegistroVentasModule() {
       const opts = {}
       if (filterDateFrom) opts.dateFrom = new Date(filterDateFrom + 'T00:00:00-03:00').toISOString()
       if (filterDateTo) opts.dateTo = new Date(filterDateTo + 'T23:59:59-03:00').toISOString()
-      // Sin límite: dbGetSales pagina automáticamente para traer TODAS las ventas
+      
+      // Si no hay filtro de fechas, limitamos a las últimas 500 ventas para que cargue rapidísimo.
+      // Si quieren ver más atrás, simplemente usan el filtro de fechas.
+      if (!filterDateFrom && !filterDateTo) {
+        opts.limit = 500
+      }
       
       const data = await dbGetSales(tenantId, opts)
       

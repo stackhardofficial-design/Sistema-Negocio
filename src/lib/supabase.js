@@ -629,9 +629,11 @@ export async function dbGetBuffetOrders(tenantId, status = null) {
     .select('*, buffet_order_items(*, buffet_products(name)), users(name)')
     .eq('tenant_id', tenantId)
   if (status) q = q.eq('status', status)
-  q = q.order('created_at', { ascending: true })
+  // Ordenar descendente para obtener los más recientes, limitamos a 300 para no saturar la app
+  q = q.order('created_at', { ascending: false }).limit(300)
   const { data } = await q
-  return data || []
+  // Revertimos para que en la UI se vean en el orden original (los más viejos arriba)
+  return data ? data.reverse() : []
 }
 
 export async function dbCreateBuffetOrder(tenantId, userId, items, customerName = null, notes = null) {
