@@ -106,9 +106,23 @@ export default function DashboardModule() {
   const lowStockProducts = products.filter(p => p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock)
 
   // Desglose de ventas de hoy por método de pago
-  const ventasEfectivo = todaySales.filter(s => !s.payment_method || s.payment_method === 'efectivo').reduce((a, s) => a + (s.total_amount || 0), 0)
-  const ventasTransferencia = todaySales.filter(s => s.payment_method === 'transferencia').reduce((a, s) => a + (s.total_amount || 0), 0)
-  const ventasDeudor = todaySales.filter(s => s.payment_method === 'deudor').reduce((a, s) => a + (s.total_amount || 0), 0)
+  let ventasEfectivo = 0
+  let ventasTransferencia = 0
+  let ventasDeudor = 0
+  todaySales.forEach(s => {
+    const amount = s.total_amount || 0
+    if (s.payment_method === 'multipagos') {
+      ventasEfectivo += Number(s.cash_amount || 0)
+      ventasTransferencia += Number(s.transfer_amount || 0)
+    } else if (s.payment_method === 'transferencia') {
+      ventasTransferencia += amount
+    } else if (s.payment_method === 'deudor') {
+      ventasDeudor += amount
+    } else {
+      // efectivo o sin método (default)
+      ventasEfectivo += amount
+    }
+  })
   const totalDeudaActiva = debtors.filter(d => !d.is_settled).reduce((a, d) => a + (d.total_debt || 0), 0)
 
   // ===== Filtrar ventas según el rango elegido (para los gráficos) =====
