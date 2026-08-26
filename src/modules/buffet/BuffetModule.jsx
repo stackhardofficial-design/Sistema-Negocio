@@ -110,7 +110,6 @@ const PAYMENT_METHODS = [
   { id: 'efectivo', label: 'Efectivo', sublabel: 'Pago en mano', IconComponent: IconEfectivo, color: '#10b981', colorSoft: 'rgba(16,185,129,0.12)', colorBorder: 'rgba(16,185,129,0.45)' },
   { id: 'transferencia', label: 'Mercado Pago', sublabel: 'Transferencia', IconComponent: IconMercadoPago, color: '#009EE3', colorSoft: 'rgba(0,158,227,0.12)', colorBorder: 'rgba(0,158,227,0.45)' },
   { id: 'deudor', label: 'Deudor', sublabel: 'Cargar a cuenta', IconComponent: IconDeudor, color: '#f59e0b', colorSoft: 'rgba(245,158,11,0.12)', colorBorder: 'rgba(245,158,11,0.45)' },
-  { id: 'multipagos', label: 'Multipagos', sublabel: 'Efectivo + Transf', IconComponent: IconMultipagos, color: '#8b5cf6', colorSoft: 'rgba(139,92,246,0.12)', colorBorder: 'rgba(139,92,246,0.45)' },
 ]
 
 export default function BuffetModule() {
@@ -462,7 +461,7 @@ export default function BuffetModule() {
       })
 
       playBeep()
-      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : paymentMethod === 'multipagos' ? '💳 Multipagos' : `📒 ${selectedDebtor?.name || ''}`
+      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : `📒 ${selectedDebtor?.name || ''}`
       toast(`${qty}x ${bp.name} enviado a la cocina · ${formatMoney(total)} · ${methodLabel}`, 'success')
 
       setQuantity(1)

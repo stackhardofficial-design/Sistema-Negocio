@@ -421,7 +421,6 @@ export default function RegistroVentasModule() {
               <option value="">Todos</option>
               <option value="efectivo">💵 Efectivo</option>
               <option value="transferencia">📲 Transferencia</option>
-              <option value="multipagos">💳 Multipagos</option>
               <option value="deudor">📒 Deudor</option>
             </select>
           </div>

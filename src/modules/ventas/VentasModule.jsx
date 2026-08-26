@@ -157,17 +157,7 @@ const PAYMENT_METHODS = [
     colorSoft: 'rgba(245,158,11,0.12)',
     colorBorder: 'rgba(245,158,11,0.45)',
     colorGlow: 'rgba(245,158,11,0.22)',
-  },
-  {
-    id: 'multipagos',
-    label: 'Multipagos',
-    sublabel: 'Efectivo + Transf',
-    IconComponent: IconMultipagos,
-    color: '#8b5cf6',
-    colorSoft: 'rgba(139,92,246,0.12)',
-    colorBorder: 'rgba(139,92,246,0.45)',
-    colorGlow: 'rgba(139,92,246,0.25)',
-  },
+  }
 ]
 
 export default function VentasModule() {
@@ -334,7 +324,7 @@ export default function VentasModule() {
       setFlashSuccess(true)
       setTimeout(() => setFlashSuccess(false), 300)
 
-      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : paymentMethod === 'multipagos' ? '💳 Multipagos' : `📒 ${selectedDebtor?.name || ''}`
+      const methodLabel = paymentMethod === 'efectivo' ? '💵' : paymentMethod === 'transferencia' ? '📲' : `📒 ${selectedDebtor?.name || ''}`
       toast(`${qty}x ${product.name} · ${formatMoney(total)} · ${methodLabel}`, 'success')
 
       setQuantity(1)
