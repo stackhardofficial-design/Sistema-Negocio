@@ -170,7 +170,7 @@ export default function TenantPaymentsPanel() {
             background: 'linear-gradient(135deg, #ef4444, #dc2626)',
             display: 'inline-block'
           }} />
-          Vencido (día &gt; 10)
+          Vencido (día &gt;= 10)
         </span>
       </div>
 
@@ -226,7 +226,7 @@ export default function TenantPaymentsPanel() {
                     const isCurrentMonth = year === currentYear && month === currentMonth
                     const isPastDue = year < currentYear ||
                       (year === currentYear && month < currentMonth) ||
-                      (isCurrentMonth && currentDay > 10)
+                      (isCurrentMonth && currentDay >= 10)
                     const isOverdue = !paid && isPastDue
                     const isTogglingThis = toggling === `${t.id}-${month}`
                     const isFutureMonth = year > currentYear ||

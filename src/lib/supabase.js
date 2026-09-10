@@ -989,8 +989,8 @@ export async function dbCheckTenantPaymentStatus(tenantId) {
     .maybeSingle()
 
   const isPaid = data?.is_paid === true
-  // Bloqueado si: no pagado Y día > 10
-  const isBlocked = !isPaid && day > 10
+  // Bloqueado si: no pagado Y día >= 10 (el corte es el mismo día 10, no el 11)
+  const isBlocked = !isPaid && day >= 10
   return { isPaid, isBlocked, year, month, day }
 }
 
