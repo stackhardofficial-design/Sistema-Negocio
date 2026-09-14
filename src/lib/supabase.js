@@ -866,13 +866,14 @@ export async function dbGetExpenses(tenantId, opts = {}) {
 
   while (fetchMore) {
     let q = sb.from('expenses')
-      .select('*, expense_categories(name, icon), users(name)')
+      .select('*, expense_categories(name, icon), users(name), topes(id, name, weekly_amount)')
       .eq('tenant_id', tenantId)
       .or('is_active.eq.true,is_active.is.null')
 
     if (opts.dateFrom) q = q.gte('expense_date', opts.dateFrom)
     if (opts.dateTo) q = q.lte('expense_date', opts.dateTo)
     if (opts.categoryId) q = q.eq('category_id', opts.categoryId)
+    if (opts.topeId) q = q.eq('tope_id', opts.topeId)
 
     q = q.order('expense_date', { ascending: false }).order('created_at', { ascending: false })
     q = q.range(offset, offset + limit - 1)
@@ -909,6 +910,41 @@ export async function dbUpdateExpense(id, payload) {
 
 export async function dbDeleteExpense(id) {
   const { error } = await sb.from('expenses').update({ is_active: false }).eq('id', id)
+  if (error) throw error
+}
+
+// ===== TOPES DE GASTO =====
+export async function dbGetTopes(tenantId) {
+  const { data, error } = await sb.from('topes')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function dbCreateTope(payload) {
+  const { data, error } = await sb.from('topes')
+    .insert({ ...payload, is_active: true })
+    .select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbUpdateTope(id, payload) {
+  const { data, error } = await sb.from('topes')
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select().single()
+  if (error) throw error
+  return data
+}
+
+export async function dbDeleteTope(id) {
+  const { error } = await sb.from('topes')
+    .update({ is_active: false })
+    .eq('id', id)
   if (error) throw error
 }
 

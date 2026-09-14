@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetSales, dbCancelSale, dbLogActivity,
-  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo, dbResolveMultipagoSale, dbGetExpenses, dbGetBuffetProducts
+  dbUpdateSaleItem, dbDeleteSaleItem, dbMarkAutoconsumo, dbResolveMultipagoSale, dbGetExpenses, dbGetBuffetProducts,
+  dbDeleteExpense, dbUpdateExpense
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import {
@@ -48,6 +49,7 @@ export default function RegistroVentasModule() {
   const [detailModal, setDetailModal] = useState({ open: false, sale: null })
   const [cancelModal, setCancelModal] = useState({ open: false, sale: null, reason: '' })
   const [editModal, setEditModal] = useState({ open: false, sale: null, items: [] })
+  const [editIncomeModal, setEditIncomeModal] = useState({ open: false, sale: null, amount: '', payment_method: 'efectivo', description: '' })
   const [savingEdit, setSavingEdit] = useState(false)
   const [multipagoModal, setMultipagoModal] = useState({ open: false, sale: null, cash: '', transfer: '' })
   const [buffetProducts, setBuffetProducts] = useState([])
@@ -75,7 +77,7 @@ export default function RegistroVentasModule() {
         created_at: e.created_at,
         total_amount: e.amount,
         total_cost: 0,
-        payment_method: 'efectivo',
+        payment_method: e.payment_method || 'efectivo',
         status: 'completed',
         is_income: true,
         users: { name: e.users?.name || 'Caja' },
@@ -220,22 +222,40 @@ export default function RegistroVentasModule() {
     }
   }
 
-  // ===== ANULAR VENTA =====
+  // ===== ANULAR VENTA O INGRESO =====
   async function handleCancel() {
     if (!cancelModal.sale || !cancelModal.reason.trim()) return toast('Ingresá un motivo', 'warning')
     try {
-      await dbCancelSale(cancelModal.sale.id, userInfo?.id, cancelModal.reason)
-      await dbLogActivity(tenantId, userInfo?.id, 'cancel', 'sale', cancelModal.sale.id, { reason: cancelModal.reason })
-      toast('Venta anulada correctamente', 'success')
+      if (cancelModal.sale.is_income) {
+        await dbDeleteExpense(cancelModal.sale.id)
+        await dbLogActivity(tenantId, userInfo?.id, 'cancel', 'expense_income', cancelModal.sale.id, { reason: cancelModal.reason })
+        toast('Ingreso de caja anulado correctamente', 'success')
+      } else {
+        await dbCancelSale(cancelModal.sale.id, userInfo?.id, cancelModal.reason)
+        await dbLogActivity(tenantId, userInfo?.id, 'cancel', 'sale', cancelModal.sale.id, { reason: cancelModal.reason })
+        toast('Venta anulada correctamente', 'success')
+      }
       setCancelModal({ open: false, sale: null, reason: '' })
       setDetailModal({ open: false, sale: null })
+      loadSales(false)
     } catch (err) {
       toast(`Error: ${err.message}`, 'danger')
     }
   }
 
-  // ===== EDITAR VENTA =====
+  // ===== EDITAR VENTA O INGRESO =====
   function openEditModal(sale) {
+    if (sale.is_income) {
+      setEditIncomeModal({
+        open: true,
+        sale,
+        amount: String(sale.total_amount || ''),
+        payment_method: sale.payment_method || 'efectivo',
+        description: sale.sale_items?.[0]?.custom_name || ''
+      })
+      return
+    }
+
     setEditModal({
       open: true,
       sale,
@@ -245,6 +265,32 @@ export default function RegistroVentasModule() {
         toDelete: false
       }))
     })
+  }
+
+  async function saveEditIncome() {
+    if (!editIncomeModal.sale) return
+    const amt = parseFloat(editIncomeModal.amount)
+    if (isNaN(amt) || amt <= 0) return toast('Monto inválido', 'warning')
+
+    setSavingEdit(true)
+    try {
+      await dbUpdateExpense(editIncomeModal.sale.id, {
+        amount: amt,
+        payment_method: editIncomeModal.payment_method,
+        description: editIncomeModal.description?.trim()
+      })
+      await dbLogActivity(tenantId, userInfo?.id, 'update', 'expense_income', editIncomeModal.sale.id, {
+        amount: amt,
+        payment_method: editIncomeModal.payment_method
+      })
+      toast('Monto del ingreso modificado correctamente', 'success')
+      setEditIncomeModal({ open: false, sale: null, amount: '', payment_method: 'efectivo', description: '' })
+      loadSales(false)
+    } catch (err) {
+      toast(`Error: ${err.message}`, 'danger')
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   function updateItemQty(itemId, delta) {
@@ -581,20 +627,20 @@ export default function RegistroVentasModule() {
               </div>
             )}
 
-            {/* Acciones (solo admin + completada) */}
-            {isAdmin() && detailModal.sale.status === 'completed' && (
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            {/* Acciones para admin */}
+            {isAdmin() && !detailModal.sale.status?.includes('cancelled') && (
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
                 <button
-                  onClick={() => { setDetailModal({ open: false, sale: null }); openEditModal(detailModal.sale) }}
+                  onClick={() => { const s = detailModal.sale; setDetailModal({ open: false, sale: null }); openEditModal(s); }}
                   className="btn btn-secondary"
                 >
-                  <Edit2 size={14} /> Modificar
+                  <Edit2 size={14} /> {detailModal.sale.is_income ? 'Modificar ingreso' : 'Modificar venta'}
                 </button>
                 <button
                   onClick={() => { setDetailModal({ open: false, sale: null }); setCancelModal({ open: true, sale: detailModal.sale, reason: '' }) }}
                   className="btn btn-danger"
                 >
-                  <Trash2 size={14} /> Anular venta
+                  <Trash2 size={14} /> {detailModal.sale.is_income ? 'Anular ingreso' : 'Anular venta'}
                 </button>
               </div>
             )}
@@ -606,7 +652,7 @@ export default function RegistroVentasModule() {
       <Modal
         open={cancelModal.open}
         onClose={() => setCancelModal({ open: false, sale: null, reason: '' })}
-        title="Anular venta"
+        title={cancelModal.sale?.is_income ? "Anular ingreso de caja" : "Anular venta"}
         footer={
           <>
             <button onClick={() => setCancelModal({ open: false, sale: null, reason: '' })} className="btn btn-secondary">
@@ -629,7 +675,7 @@ export default function RegistroVentasModule() {
           </div>
           {cancelModal.sale && (
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Venta de <strong>{cancelModal.sale.users?.name || 'usuario'}</strong> por{' '}
+              {cancelModal.sale.is_income ? 'Ingreso registrado' : 'Venta'} de <strong>{cancelModal.sale.users?.name || 'usuario'}</strong> por{' '}
               <strong>{formatMoney(cancelModal.sale.total_amount)}</strong>{' '}
               ({formatDateTime(cancelModal.sale?.created_at || '')})
             </div>
@@ -639,8 +685,77 @@ export default function RegistroVentasModule() {
             <textarea
               value={cancelModal.reason}
               onChange={e => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
-              placeholder="Ej: Error en el escaneo, producto devuelto..."
+              placeholder={cancelModal.sale?.is_income ? "Ej: Ingreso duplicado, error de monto..." : "Ej: Error en el escaneo, producto devuelto..."}
               rows={3}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* ===== MODAL: MODIFICAR INGRESO ===== */}
+      <Modal
+        open={editIncomeModal.open}
+        onClose={() => !savingEdit && setEditIncomeModal({ open: false, sale: null, amount: '', payment_method: 'efectivo', description: '' })}
+        title="Modificar Ingreso de Caja"
+        size="sm"
+        footer={
+          <>
+            <button
+              onClick={() => setEditIncomeModal({ open: false, sale: null, amount: '', payment_method: 'efectivo', description: '' })}
+              className="btn btn-secondary"
+              disabled={savingEdit}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={saveEditIncome}
+              className="btn btn-primary"
+              disabled={savingEdit}
+            >
+              {savingEdit ? 'Guardando...' : <><Save size={14} /> Guardar cambios</>}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+            Ajustá el monto o método de pago de este ingreso. Los cambios se actualizarán automáticamente en Finanzas y Flujo de Caja.
+          </p>
+
+          <div className="form-group">
+            <label className="form-label">Monto ($) *</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={editIncomeModal.amount}
+              onChange={e => setEditIncomeModal(prev => ({ ...prev, amount: e.target.value }))}
+              placeholder="0.00"
+              disabled={savingEdit}
+              autoFocus
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Método de Pago</label>
+            <select
+              value={editIncomeModal.payment_method || 'efectivo'}
+              onChange={e => setEditIncomeModal(prev => ({ ...prev, payment_method: e.target.value }))}
+              disabled={savingEdit}
+            >
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="transferencia">📲 Mercado Pago / Transferencia</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Detalle / Concepto</label>
+            <input
+              type="text"
+              value={editIncomeModal.description}
+              onChange={e => setEditIncomeModal(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Ej: Ingreso manual, cambio de caja..."
+              disabled={savingEdit}
             />
           </div>
         </div>
@@ -884,12 +999,12 @@ function SaleRow({ sale, isAdmin, onDetail, onCancel, onEdit, onResolveMultipago
       </td>
       {isAdmin && (
         <td style={{ padding: '12px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-          {!cancelled && !isAutoconsumo && !isPendingMultipago && !sale.is_income ? (
+          {!cancelled && !isAutoconsumo && !isPendingMultipago ? (
             <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-              <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Editar / Autoconsumo" style={{ padding: '4px 8px' }}>
+              <button onClick={onEdit} className="btn btn-secondary btn-sm" title={sale.is_income ? "Modificar monto del ingreso" : "Editar / Autoconsumo"} style={{ padding: '4px 8px' }}>
                 <Edit2 size={12} />
               </button>
-              <button onClick={onCancel} className="btn btn-danger btn-sm" title="Anular" style={{ padding: '4px 8px' }}>
+              <button onClick={onCancel} className="btn btn-danger btn-sm" title={sale.is_income ? "Anular ingreso de caja" : "Anular venta"} style={{ padding: '4px 8px' }}>
                 <Trash2 size={12} />
               </button>
             </div>

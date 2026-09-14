@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../../lib/AppContext'
 import {
   sb, dbGetExpenseCategories, dbCreateExpenseCategory, dbUpdateExpenseCategory, dbDeleteExpenseCategory,
-  dbGetExpenses, dbCreateExpense, dbDeleteExpense,
-  dbGetSaleSummary, dbGetProducts, dbLogActivity
+  dbGetExpenses, dbCreateExpense, dbUpdateExpense, dbDeleteExpense,
+  dbGetSaleSummary, dbGetProducts, dbLogActivity, dbGetTopes
 } from '../../lib/supabase'
 import Modal from '../../components/Modal'
+import TopesTab, { getWeekBounds } from './TopesTab'
 import { 
   TrendingUp, TrendingDown, DollarSign, Calendar,
-  Plus, List, Trash2, Edit2, LayoutGrid, Search, AlertCircle
-, Lock, RefreshCw } from 'lucide-react'
+  Plus, List, Trash2, Edit2, LayoutGrid, Search, AlertCircle,
+  Lock, RefreshCw, Target
+} from 'lucide-react'
 
 function formatMoney(n) {
   return `$${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
@@ -23,21 +25,26 @@ function formatMoney(n) {
 
 export default function FinanzasModule() {
   const { tenantId, userInfo, toast } = useApp()
-  const [activeTab, setActiveTab] = useState('resumen') // resumen, gastos, planilla
+  const [activeTab, setActiveTab] = useState('resumen') // resumen, topes, gastos, planilla
+
+  // Semana actual por defecto para el resumen
+  const currentWeek = useMemo(() => getWeekBounds(new Date()), [])
 
   // Datos
   const [categories, setCategories] = useState([])
   const [expenses, setExpenses] = useState([])
+  const [topes, setTopes] = useState([])
   const [salesSummary, setSalesSummary] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Filtros
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  // Filtros (Por default la semana actual en la que está el usuario)
+  const [dateFrom, setDateFrom] = useState(currentWeek.fromYMD)
+  const [dateTo, setDateTo] = useState(currentWeek.toYMD)
   const [gastosSearch, setGastosSearch] = useState('')
   const [gastosTypeFilter, setGastosTypeFilter] = useState('all')
   const [gastosCategoryFilter, setGastosCategoryFilter] = useState('all')
+  const [gastosTopeFilter, setGastosTopeFilter] = useState('all')
   const [gastosSort, setGastosSort] = useState('date_desc')
   const [gastosUserFilter, setGastosUserFilter] = useState('all')
   const [gastosPaymentFilter, setGastosPaymentFilter] = useState('all')
@@ -45,7 +52,16 @@ export default function FinanzasModule() {
 
   // Modales
   const [expenseModal, setExpenseModal] = useState({ open: false, edit: null })
-  const [expenseForm, setExpenseForm] = useState({ amount: '', category_id: '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'variable', payment_method: 'efectivo' })
+  const [expenseForm, setExpenseForm] = useState({
+    amount: '',
+    category_id: '',
+    description: '',
+    expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
+    expense_type: 'variable',
+    payment_method: 'efectivo',
+    belongs_to_tope: true,
+    tope_id: ''
+  })
   
   const [catModal, setCatModal] = useState({ open: false, edit: null })
   const [catForm, setCatForm] = useState({ name: '' })
@@ -61,6 +77,9 @@ export default function FinanzasModule() {
       
       const exps = await dbGetExpenses(tenantId, { dateFrom, dateTo })
       setExpenses(exps)
+
+      const tops = await dbGetTopes(tenantId)
+      setTopes(tops)
       
       // Obtener resumen de ventas para calcular ingresos
       // Ajustar zona horaria a Argentina (-03:00) para calcular correctamente el inicio y fin del día
@@ -86,20 +105,63 @@ export default function FinanzasModule() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_categories', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'topes', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .subscribe()
     return () => { sb.removeChannel(channel) }
   }, [tenantId, dateFrom, dateTo])
 
   // ===== GASTOS =====
+  function handleOpenExpenseModalWithTope(topeId) {
+    setExpenseForm({
+      amount: '',
+      category_id: categories[0]?.id || '',
+      description: '',
+      expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
+      expense_type: 'variable',
+      payment_method: 'efectivo',
+      belongs_to_tope: true,
+      tope_id: topeId || topes[0]?.id || ''
+    })
+    setExpenseModal({ open: true, edit: null })
+  }
+
+  function handleOpenEditExpense(exp) {
+    setExpenseForm({
+      amount: String(exp.amount),
+      category_id: exp.category_id || '',
+      description: exp.description || '',
+      expense_date: exp.expense_date || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
+      expense_type: exp.expense_type || 'variable',
+      payment_method: exp.payment_method || 'efectivo',
+      belongs_to_tope: Boolean(exp.tope_id),
+      tope_id: exp.tope_id || topes[0]?.id || ''
+    })
+    setExpenseModal({ open: true, edit: exp })
+  }
+
   async function handleSaveExpense() {
     if (!expenseForm.amount || expenseForm.amount <= 0) return toast('Monto inválido', 'warning')
     if (!expenseForm.category_id) return toast('Seleccione una categoría', 'warning')
     if (!expenseForm.expense_date) return toast('Fecha inválida', 'warning')
 
+    const topeIdToSave = (expenseForm.expense_type !== 'ingreso' && expenseForm.belongs_to_tope && expenseForm.tope_id)
+      ? expenseForm.tope_id
+      : null
+
     setSaving(true)
     try {
       if (expenseModal.edit) {
-        // Edit flow if needed later
+        await dbUpdateExpense(expenseModal.edit.id, {
+          category_id: expenseForm.category_id,
+          amount: parseFloat(expenseForm.amount),
+          description: expenseForm.description?.trim(),
+          expense_date: expenseForm.expense_date,
+          expense_type: expenseForm.expense_type || 'variable',
+          payment_method: expenseForm.payment_method || 'efectivo',
+          tope_id: topeIdToSave
+        })
+        await dbLogActivity(tenantId, userInfo?.id, 'update', 'expense', expenseModal.edit.id, { amount: expenseForm.amount, tope_id: topeIdToSave })
+        toast('Gasto modificado correctamente', 'success')
       } else {
         const created = await dbCreateExpense({
           tenant_id: tenantId,
@@ -109,9 +171,10 @@ export default function FinanzasModule() {
           description: expenseForm.description?.trim(),
           expense_date: expenseForm.expense_date,
           expense_type: expenseForm.expense_type || 'variable',
-          payment_method: expenseForm.payment_method || 'efectivo'
+          payment_method: expenseForm.payment_method || 'efectivo',
+          tope_id: topeIdToSave
         })
-        await dbLogActivity(tenantId, userInfo?.id, 'create', 'expense', created.id, { amount: expenseForm.amount, category_id: expenseForm.category_id })
+        await dbLogActivity(tenantId, userInfo?.id, 'create', 'expense', created.id, { amount: expenseForm.amount, category_id: expenseForm.category_id, tope_id: topeIdToSave })
         toast(expenseForm.expense_type === 'ingreso' ? 'Ingreso registrado' : 'Gasto registrado', 'success')
       }
       setExpenseModal({ open: false, edit: null })
@@ -270,14 +333,20 @@ export default function FinanzasModule() {
   const filteredExpenses = expenses.filter(exp => {
     if (gastosTypeFilter !== 'all' && exp.expense_type !== gastosTypeFilter) return false
     if (gastosCategoryFilter !== 'all' && exp.category_id !== gastosCategoryFilter) return false
+    if (gastosTopeFilter !== 'all') {
+      if (gastosTopeFilter === 'sin_tope' && exp.tope_id) return false
+      if (gastosTopeFilter === 'con_tope' && !exp.tope_id) return false
+      if (gastosTopeFilter !== 'sin_tope' && gastosTopeFilter !== 'con_tope' && exp.tope_id !== gastosTopeFilter) return false
+    }
     if (gastosUserFilter !== 'all' && exp.users?.name !== gastosUserFilter) return false
     if (gastosPaymentFilter !== 'all' && (exp.payment_method || 'efectivo') !== gastosPaymentFilter) return false
     if (gastosSearch.trim()) {
       const q = gastosSearch.toLowerCase()
       const desc = exp.description?.toLowerCase() || ''
       const cat = exp.expense_categories?.name?.toLowerCase() || ''
+      const tope = exp.topes?.name?.toLowerCase() || ''
       const amount = String(exp.amount)
-      if (!desc.includes(q) && !cat.includes(q) && !amount.includes(q)) return false
+      if (!desc.includes(q) && !cat.includes(q) && !tope.includes(q) && !amount.includes(q)) return false
     }
     return true
   }).sort((a, b) => {
@@ -291,7 +360,7 @@ export default function FinanzasModule() {
   // Reset display limit when filters change
   useEffect(() => {
     setDisplayLimit(100)
-  }, [gastosTypeFilter, gastosCategoryFilter, gastosUserFilter, gastosPaymentFilter, gastosSearch, gastosSort, expenses])
+  }, [gastosTypeFilter, gastosCategoryFilter, gastosTopeFilter, gastosUserFilter, gastosPaymentFilter, gastosSearch, gastosSort, expenses])
 
   const totalFilteredGastos = filteredExpenses.reduce((sum, e) => sum + (e.expense_type === 'ingreso' ? -Number(e.amount) : Number(e.amount)), 0)
 
@@ -349,7 +418,16 @@ export default function FinanzasModule() {
               <TrendingUp size={16} /> Registrar Ingreso
             </button>
             <button onClick={() => {
-              setExpenseForm({ amount: '', category_id: categories[0]?.id || '', description: '', expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }), expense_type: 'variable' })
+              setExpenseForm({
+                amount: '',
+                category_id: categories[0]?.id || '',
+                description: '',
+                expense_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }),
+                expense_type: 'variable',
+                payment_method: 'efectivo',
+                belongs_to_tope: true,
+                tope_id: topes[0]?.id || ''
+              })
               setExpenseModal({ open: true, edit: null })
             }} className="btn btn-primary">
               <TrendingDown size={16} /> Registrar Gasto
@@ -357,19 +435,66 @@ export default function FinanzasModule() {
           </div>
         </div>
 
-        {/* Fechas */}
+        {/* Fechas con atajos rápidos */}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', background: 'var(--bg-secondary)', padding: '10px 16px', borderRadius: '12px', width: '100%' }}>
           <Calendar size={18} color="var(--text-muted)" />
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Periodo:</span>
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="input-sm" style={{ padding: '6px' }} />
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>hasta</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="input-sm" style={{ padding: '6px' }} />
+          
+          <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const w = getWeekBounds(new Date())
+                setDateFrom(w.fromYMD)
+                setDateTo(w.toYMD)
+              }}
+              className={`btn btn-sm ${dateFrom === currentWeek.fromYMD && dateTo === currentWeek.toYMD ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+              title="Semana actual en la que estás (Lunes a Domingo)"
+            >
+              📅 Esta semana
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date()
+                const y = now.getFullYear()
+                const m = String(now.getMonth() + 1).padStart(2, '0')
+                const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
+                setDateFrom(`${y}-${m}-01`)
+                setDateTo(`${y}-${m}-${String(lastDay).padStart(2, '0')}`)
+              }}
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+              title="Mes actual"
+            >
+              🗓️ Este mes
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDateFrom('')
+                setDateTo('')
+              }}
+              className={`btn btn-sm ${!dateFrom && !dateTo ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+              title="Todo el histórico acumulado"
+            >
+              🌐 Histórico completo
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
         <div className="tabs" style={{ width: '100%', marginBottom: 0 }}>
           <button className={`tab ${activeTab === 'resumen' ? 'active' : ''}`} onClick={() => setActiveTab('resumen')}>
             <TrendingUp size={16} /> Resumen
+          </button>
+          <button className={`tab ${activeTab === 'topes' ? 'active' : ''}`} onClick={() => setActiveTab('topes')}>
+            <Target size={16} /> Topes de Gasto
           </button>
           <button className={`tab ${activeTab === 'gastos' ? 'active' : ''}`} onClick={() => setActiveTab('gastos')}>
             <List size={16} /> Historial Gastos
@@ -506,6 +631,20 @@ export default function FinanzasModule() {
               </div>
             )}
 
+            {/* TAB: TOPES */}
+            {activeTab === 'topes' && (
+              <TopesTab
+                tenantId={tenantId}
+                userInfo={userInfo}
+                topes={topes}
+                expenses={expenses}
+                categories={categories}
+                onRefresh={load}
+                toast={toast}
+                onOpenExpenseModalWithTope={handleOpenExpenseModalWithTope}
+              />
+            )}
+
             {/* TAB: GASTOS */}
             {activeTab === 'gastos' && (
               <div className="fade-in card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -528,6 +667,12 @@ export default function FinanzasModule() {
                         <option value="all">Categorías: Todas</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
+                      <select className="input-sm" value={gastosTopeFilter} onChange={e => setGastosTopeFilter(e.target.value)} style={{ padding: '6px' }} title="Tope">
+                        <option value="all">Topes: Todos</option>
+                        <option value="con_tope">🎯 Con tope asignado</option>
+                        <option value="sin_tope">Sin tope</option>
+                        {topes.map(t => <option key={t.id} value={t.id}>🎯 {t.name}</option>)}
+                      </select>
                       <select className="input-sm" value={gastosUserFilter} onChange={e => setGastosUserFilter(e.target.value)} style={{ padding: '6px' }} title="Usuario">
                         <option value="all">Usuarios: Todos</option>
                         {[...new Set(expenses.map(e => e.users?.name).filter(Boolean))].map(u => <option key={u} value={u}>{u}</option>)}
@@ -541,8 +686,8 @@ export default function FinanzasModule() {
                         <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                         <input type="text" placeholder="Buscar..." value={gastosSearch} onChange={e => setGastosSearch(e.target.value)} className="input-sm" style={{ paddingLeft: '32px', width: '180px', padding: '6px 6px 6px 32px' }} />
                       </div>
-                      {(gastosTypeFilter !== 'all' || gastosCategoryFilter !== 'all' || gastosUserFilter !== 'all' || gastosPaymentFilter !== 'all' || gastosSearch !== '' || gastosSort !== 'date_desc') && (
-                        <button onClick={() => { setGastosTypeFilter('all'); setGastosCategoryFilter('all'); setGastosUserFilter('all'); setGastosPaymentFilter('all'); setGastosSearch(''); setGastosSort('date_desc'); }} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>
+                      {(gastosTypeFilter !== 'all' || gastosCategoryFilter !== 'all' || gastosTopeFilter !== 'all' || gastosUserFilter !== 'all' || gastosPaymentFilter !== 'all' || gastosSearch !== '' || gastosSort !== 'date_desc') && (
+                        <button onClick={() => { setGastosTypeFilter('all'); setGastosCategoryFilter('all'); setGastosTopeFilter('all'); setGastosUserFilter('all'); setGastosPaymentFilter('all'); setGastosSearch(''); setGastosSort('date_desc'); }} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>
                           Limpiar
                         </button>
                       )}
@@ -551,33 +696,44 @@ export default function FinanzasModule() {
                 </div>
 
                 <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
-                  <table className="table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
+                  <table className="table" style={{ width: '100%', minWidth: '750px', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-tertiary)', textAlign: 'left', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Fecha</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Categoría</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Tope</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Detalle / Producto</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>Cód. Barras</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>Cant.</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>P. Unit.</th>
                         <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right' }}>Total</th>
-                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'center', width: '60px' }}>Acciones</th>
+                        <th style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', textAlign: 'center', width: '80px' }}>Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredExpenses.length === 0 ? (
                         <tr>
-                          <td colSpan="8" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          <td colSpan="9" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
                             No se encontraron gastos.
                           </td>
                         </tr>
                       ) : (
                         filteredExpenses.slice(0, displayLimit).map(exp => {
                           const parsed = parseDescription(exp.description)
+                          const topeName = exp.topes?.name || (topes.find(t => t.id === exp.tope_id)?.name)
                           return (
                             <tr key={exp.id} style={{ borderBottom: '1px solid var(--border-soft)', fontSize: '0.9rem' }}>
                               <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>{formatDate(exp.expense_date)}</td>
                               <td style={{ padding: '12px 16px', fontWeight: 500 }}>{exp.expense_categories?.name || 'Sin categoría'}</td>
+                              <td style={{ padding: '12px 16px' }}>
+                                {topeName ? (
+                                  <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(245,158,11,0.12)', color: 'var(--accent)', fontWeight: 700, border: '1px solid rgba(245,158,11,0.25)', whiteSpace: 'nowrap' }}>
+                                    🎯 {topeName}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                                )}
+                              </td>
                               {parsed.isProduct ? (
                                 <>
                                   <td style={{ padding: '12px 16px' }}>{parsed.data.name}</td>
@@ -597,9 +753,14 @@ export default function FinanzasModule() {
                                 {exp.expense_type === 'ingreso' ? '+' : '-'}{formatMoney(exp.amount)}
                               </td>
                               <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
-                                  <Trash2 size={16} />
-                                </button>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  <button onClick={() => handleOpenEditExpense(exp)} className="btn-icon" title="Modificar gasto / tope" style={{ color: 'var(--text-secondary)' }}>
+                                    <Edit2 size={15} />
+                                  </button>
+                                  <button onClick={() => handleDeleteExpense(exp.id)} className="btn-icon text-danger" title="Eliminar gasto">
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -608,7 +769,7 @@ export default function FinanzasModule() {
                     </tbody>
                     <tfoot>
                       <tr style={{ background: 'var(--bg-secondary)', borderTop: '2px solid var(--border)' }}>
-                        <td colSpan="6" style={{ padding: '16px', textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                        <td colSpan="7" style={{ padding: '16px', textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
                           TOTAL FILTRADO:
                         </td>
                         <td style={{ padding: '16px', textAlign: 'right', fontWeight: 800, fontSize: '1.2rem', color: totalFilteredGastos > 0 ? 'var(--text-primary)' : (totalFilteredGastos < 0 ? 'var(--success)' : 'var(--text-muted)') }}>
@@ -735,12 +896,94 @@ export default function FinanzasModule() {
         )}
       </div>
 
-      {/* Modal Nuevo Gasto/Ingreso */}
-      <Modal open={expenseModal.open} onClose={() => !saving && setExpenseModal({ open: false, edit: null })} title={expenseForm.expense_type === 'ingreso' ? 'Registrar Ingreso' : 'Registrar Gasto'}>
+      {/* Modal Nuevo Gasto/Ingreso / Modificar Gasto */}
+      <Modal
+        open={expenseModal.open}
+        onClose={() => !saving && setExpenseModal({ open: false, edit: null })}
+        title={expenseModal.edit ? 'Modificar Gasto' : expenseForm.expense_type === 'ingreso' ? 'Registrar Ingreso' : 'Registrar Gasto'}
+      >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {categories.length === 0 && (
             <div style={{ padding: '12px', background: 'var(--warning-soft)', color: 'var(--warning)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', gap: '8px' }}>
               <AlertCircle size={16} /> Primero creá al menos una categoría de gastos.
+            </div>
+          )}
+
+          {/* Pregunta sobre Tope de Gasto (Habilitado por default) */}
+          {expenseForm.expense_type !== 'ingreso' && (
+            <div style={{
+              background: expenseForm.belongs_to_tope ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-tertiary)',
+              border: `1px solid ${expenseForm.belongs_to_tope ? 'rgba(245, 158, 11, 0.35)' : 'var(--border)'}`,
+              borderRadius: '10px',
+              padding: '12px 14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expenseForm.belongs_to_tope ? '10px' : '0' }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Target size={15} color="var(--accent)" /> ¿Este gasto pertenece a un tope?
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Suma al avance presupuestario semanal del tope
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setExpenseForm({ ...expenseForm, belongs_to_tope: true, tope_id: expenseForm.tope_id || topes[0]?.id || '' })}
+                    disabled={saving}
+                    style={{
+                      padding: '5px 14px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer',
+                      border: '1px solid',
+                      borderColor: expenseForm.belongs_to_tope ? 'var(--accent)' : 'var(--border)',
+                      background: expenseForm.belongs_to_tope ? 'var(--accent)' : 'var(--bg)',
+                      color: expenseForm.belongs_to_tope ? '#000' : 'var(--text-muted)'
+                    }}
+                  >
+                    SÍ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpenseForm({ ...expenseForm, belongs_to_tope: false })}
+                    disabled={saving}
+                    style={{
+                      padding: '5px 14px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer',
+                      border: '1px solid',
+                      borderColor: !expenseForm.belongs_to_tope ? 'var(--text-muted)' : 'var(--border)',
+                      background: !expenseForm.belongs_to_tope ? 'var(--bg-secondary)' : 'var(--bg)',
+                      color: !expenseForm.belongs_to_tope ? 'var(--text-primary)' : 'var(--text-muted)'
+                    }}
+                  >
+                    NO
+                  </button>
+                </div>
+              </div>
+
+              {expenseForm.belongs_to_tope && (
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem', marginBottom: '4px' }}>
+                    Indicar Tope Semanal *
+                  </label>
+                  {topes.length === 0 ? (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--warning)', padding: '6px 0' }}>
+                      ⚠️ No hay topes creados todavía. Podés crear uno en la pestaña <strong>"Topes de Gasto"</strong>.
+                    </div>
+                  ) : (
+                    <select
+                      value={expenseForm.tope_id || ''}
+                      onChange={e => setExpenseForm({ ...expenseForm, tope_id: e.target.value })}
+                      disabled={saving}
+                      style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)' }}
+                    >
+                      <option value="">Seleccionar tope...</option>
+                      {topes.map(t => (
+                        <option key={t.id} value={t.id}>
+                          🎯 {t.name} (Tope: {formatMoney(t.weekly_amount)}/sem)
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
           )}
           
@@ -840,7 +1083,7 @@ export default function FinanzasModule() {
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             <button onClick={handleSaveExpense} disabled={saving || categories.length === 0} className="btn btn-primary" style={{ flex: 1 }}>
-              {saving ? 'Guardando...' : expenseForm.expense_type === 'ingreso' ? 'Guardar Ingreso' : 'Guardar Gasto'}
+              {saving ? 'Guardando...' : expenseModal.edit ? 'Guardar Cambios' : (expenseForm.expense_type === 'ingreso' ? 'Guardar Ingreso' : 'Guardar Gasto')}
             </button>
             <button onClick={() => setExpenseModal({ open: false, edit: null })} disabled={saving} className="btn btn-secondary">
               Cancelar
