@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../lib/AppContext'
-import { sb, dbGetSales, dbGetProducts, dbGetDebtors } from '../../lib/supabase'
+import { sb, dbGetSales, dbGetProducts, dbGetDebtors, dbGetExpenses } from '../../lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -60,17 +60,45 @@ export default function DashboardModule() {
     today.setHours(0, 0, 0, 0)
     const fetchFrom = fromDate < today ? fromDate : today
 
+    const dateFromStr = fetchFrom.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+    const dateToStr = (timeFilter === 'custom' && customTo) ? toDate.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }) : undefined
+
     try {
-      const [s, p, d] = await Promise.all([
+      const [s, p, d, exps] = await Promise.all([
         dbGetSales(tenantId, { 
           dateFrom: fetchFrom.toISOString(), 
           dateTo: (timeFilter === 'custom' && customTo) ? toDate.toISOString() : undefined,
           status: 'completed' 
         }),
         dbGetProducts(tenantId),
-        dbGetDebtors(tenantId, { includeSettled: false })
+        dbGetDebtors(tenantId, { includeSettled: false }),
+        dbGetExpenses(tenantId, {
+          dateFrom: dateFromStr,
+          dateTo: dateToStr
+        })
       ])
-      setSales(s)
+
+      // Filtramos SOLAMENTE los ingresos manuales (los gastos se excluyen del dashboard según requerimiento)
+      const manualIncomes = (exps || []).filter(e => e.expense_type === 'ingreso').map(e => {
+        let createdAt = e.created_at
+        if (!createdAt && e.expense_date) {
+          createdAt = `${e.expense_date}T12:00:00-03:00`
+        }
+        return {
+          id: e.id,
+          created_at: createdAt,
+          expense_date: e.expense_date,
+          total_amount: Number(e.amount || 0),
+          total_cost: 0,
+          payment_method: e.payment_method || 'efectivo',
+          status: 'completed',
+          is_income: true,
+          users: { name: e.users?.name || 'Caja' }
+        }
+      })
+
+      const mergedSales = [...s, ...manualIncomes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setSales(mergedSales)
       setProducts(p)
       setDebtors(d)
     } catch (err) {
@@ -90,6 +118,7 @@ export default function DashboardModule() {
     const channel = sb.channel('dashboard_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `tenant_id=eq.${tenantId}` }, () => load(false))
       .subscribe()
 
     return () => { sb.removeChannel(channel) }
@@ -98,14 +127,20 @@ export default function DashboardModule() {
   // ===== Computar KPIs =====
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const todayYMD = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
 
-  const todaySales = sales.filter(s => new Date(s.created_at) >= today)
+  const todaySales = sales.filter(s => {
+    if (s.is_income && s.expense_date) {
+      return s.expense_date === todayYMD || new Date(s.created_at) >= today
+    }
+    return new Date(s.created_at) >= today
+  })
   const totalVentaHoy = todaySales.reduce((acc, s) => acc + (s.total_amount || 0), 0)
   const totalGananciaHoy = todaySales.reduce((acc, s) => acc + ((s.total_amount || 0) - (s.total_cost || 0)), 0)
   const totalTransacciones = todaySales.length
   const lowStockProducts = products.filter(p => p.stock !== null && p.min_stock !== null && p.stock <= p.min_stock)
 
-  // Desglose de ventas de hoy por método de pago
+  // Desglose de ventas de hoy por método de pago (incluye ingresos manuales en efectivo y transferencia)
   let ventasEfectivo = 0
   let ventasTransferencia = 0
   let ventasDeudor = 0
@@ -130,7 +165,12 @@ export default function DashboardModule() {
   let fromDate = new Date()
   if (timeFilter === 'today') {
     fromDate.setHours(0, 0, 0, 0)
-    filteredSales = sales.filter(s => new Date(s.created_at) >= fromDate)
+    filteredSales = sales.filter(s => {
+      if (s.is_income && s.expense_date) {
+        return s.expense_date === todayYMD || new Date(s.created_at) >= fromDate
+      }
+      return new Date(s.created_at) >= fromDate
+    })
   } else if (timeFilter === 'week') {
     fromDate.setDate(today.getDate() - 7)
     filteredSales = sales.filter(s => new Date(s.created_at) >= fromDate)
@@ -210,6 +250,7 @@ export default function DashboardModule() {
   // ===== Categorías (pie chart) filtradas =====
   const catMap = {}
   filteredSales.forEach(sale => {
+    if (sale.is_income) return
     (sale.sale_items || []).forEach(item => {
       const cat = item.products?.categories?.name || 'Sin categoría'
       catMap[cat] = (catMap[cat] || 0) + (item.quantity || 1)
